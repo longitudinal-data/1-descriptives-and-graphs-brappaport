@@ -14,8 +14,6 @@ library(psych)
 
 ```{r load data}
 data_wide <- read.csv("/Users/BrentRappaport/Box Sync/WashU/Classes/Longtudinal Methods/1-descriptives-and-graphs-brappaport/Rappaport_data.csv")
-data_wide <- data_wide[,-1]
-data_wide <- data_wide[ order(data_wide[,1]), ] 
 ```
 
 # Question 1 & 2
