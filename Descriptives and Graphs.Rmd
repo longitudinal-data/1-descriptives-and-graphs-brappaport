@@ -7,6 +7,9 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(rmarkdown)
+library(kableExtra)
 library(tidyr)
 library(ggplot2)
 library(psych)
@@ -19,7 +22,8 @@ data_wide <- read.csv("/Users/BrentRappaport/Box Sync/WashU/Classes/Longtudinal 
 # Question 1 & 2
 ```{r long data}
 data_long <- data_wide %>% 
-  gather(c(-ID,-sex,-T1_ACES_sum,-ethin,-T1Income_to_Need,-IQ), key = "time", value = "value") %>% 
+  gather(c(-ID,-sex,-T1_ACES_sum,-ethin,-T1Income_to_Need,-IQ), 
+         key = "time", value = "value") %>% 
   separate(time, into = c("variable", "wave")) %>%
   spread(variable,value)
 
@@ -32,8 +36,10 @@ samplesize_wave <- matrix(ncol=3,nrow=8)
 samplesize_wave <- as.data.frame(samplesize_wave)
 colnames(samplesize_wave) <-c("Wave","Parent-report","Teacher-report")
 
-samplesize_wave[,1:2] <- aggregate(PPeerScale ~ wave, data=data_long, function(x) {sum(!is.na(x))}, na.action = NULL)
-samplesize_wave[,3] <- aggregate(TPeerScale ~ wave, data=data_long, function(x) {sum(!is.na(x))}, na.action = NULL)[2]
+samplesize_wave[,1:2] <- aggregate(PPeerScale ~ wave, data=data_long, 
+                                   function(x) {sum(!is.na(x))}, na.action = NULL)
+samplesize_wave[,3] <- aggregate(TPeerScale ~ wave, data=data_long, 
+                                 function(x) {sum(!is.na(x))}, na.action = NULL)[2]
 ```
 
 # Question 4
@@ -47,32 +53,38 @@ Age in days may actully be a more precise measurement of time, but more difficul
 ggplot(data_long,aes(age,PPeerScale,group=ID)) +
   geom_line(alpha=1) +
   labs(x="Age",y="Parent-report Peer Scale Score") +
-  theme(text=element_text(lineheight=1, face="bold", size=15), legend.position="none")
+  theme(text=element_text(lineheight=1, face="bold", size=15), 
+        legend.position="none")
 
 ggplot(data_long,aes(age,TPeerScale,group=ID)) +
   geom_line(alpha=1) +
   labs(x="Age",y="Teacher-report Peer Scale Score") +
-  theme(text=element_text(lineheight=1, face="bold", size=15), legend.position="none")
+  theme(text=element_text(lineheight=1, face="bold", size=15), 
+        legend.position="none")
 
 ggplot(data_long,aes(age,PAggScale,group=ID)) +
   geom_line(alpha=1) +
   labs(x="Age",y="Parent-report Aggression Scale Score") +
-  theme(text=element_text(lineheight=1, face="bold", size=15), legend.position="none")
+  theme(text=element_text(lineheight=1, face="bold", size=15), 
+        legend.position="none")
 
 ggplot(data_long,aes(age,TAggScale,group=ID)) +
   geom_line(alpha=1) +
   labs(x="Age",y="Teacher-report Aggression Scale Score") +
-  theme(text=element_text(lineheight=1, face="bold", size=15), legend.position="none")
+  theme(text=element_text(lineheight=1, face="bold", size=15), 
+        legend.position="none")
 
 ggplot(data_long,aes(age,PProScale,group=ID)) +
   geom_line(alpha=1) +
   labs(x="Age",y="Parent-report Prosocial Scale Score") +
-  theme(text=element_text(lineheight=1, face="bold", size=15), legend.position="none")
+  theme(text=element_text(lineheight=1, face="bold", size=15), 
+        legend.position="none")
 
 ggplot(data_long,aes(age,TProScale,group=ID)) +
   geom_line(alpha=1) +
   labs(x="Age",y="Teacher-report Prosocial Scale Score") +
-  theme(text=element_text(lineheight=1, face="bold", size=15), legend.position="none")
+  theme(text=element_text(lineheight=1, face="bold", size=15), 
+        legend.position="none")
 ```
 
 # Question 6
@@ -81,24 +93,44 @@ ggplot(data_long,aes(age,PPeerScale,group=ID)) +
   geom_line(alpha=.25) +
   stat_smooth(aes(group=1),method="lm",size=1) +
   labs(x="Age",y="Parent-report Peer Scale Score") +
-  theme(text=element_text(lineheight=1, face="bold", size=15), legend.position="none")
+  theme(text=element_text(lineheight=1, face="bold", size=15), 
+        legend.position="none")
 
 ggplot(data_long,aes(age,PPeerScale,group=ID,color=factor(sex))) +
   geom_line(alpha=.25) +
   scale_color_manual(values=c("#377EB8","#E41A1C"),
                      name ="Sex", breaks=c(1,2),
                          labels=c("Male","Female")) +
-  stat_smooth(aes(group=factor(sex)),method="lm",formula=y~x+I(x^2),size=1) +
+  stat_smooth(aes(group=factor(sex)),method="lm",
+              formula=y~x+I(x^2),size=1) +
   labs(x="Age",y="Parent-report Peer Scale Score") +
-  theme(text=element_text(lineheight=1, face="bold", size=15), legend.position="right")
+  theme(text=element_text(lineheight=1, face="bold", size=15), 
+        legend.position="right")
 ```
 
 # Question 7
 ```{r Question 7}
-corr.test(data_wide[,15:22],adjust="bonferroni",alpha=.01)[1]
-corr.test(data_wide[,23:30],adjust="bonferroni",alpha=.01)[1]
-corr.test(data_wide[,31:38],adjust="bonferroni",alpha=.01)[1]
-corr.test(data_wide[,39:46],adjust="bonferroni",alpha=.01)[1]
-corr.test(data_wide[,47:54],adjust="bonferroni",alpha=.01)[1]
-corr.test(data_wide[,55:62],adjust="bonferroni",alpha=.01)[1]
+kable(corr.test(data_wide[,15:22],adjust="bonferroni",alpha=.01)[1],
+      digits=2,caption="Parent-report Peer Scale",
+      col.names=c("1","3","5","10","12","14","16","18"))
+
+kable(corr.test(data_wide[,39:46],adjust="bonferroni",alpha=.01)[1],
+      digits=2,caption="Teacher-report Peer Scale",
+      col.names=c("1","3","5","10","12","14","16","18"))
+
+kable(corr.test(data_wide[,23:30],adjust="bonferroni",alpha=.01)[1],
+      digits=2,caption="Parent-report Aggression Scale",
+      col.names=c("1","3","5","10","12","14","16","18"))
+
+kable(corr.test(data_wide[,47:54],adjust="bonferroni",alpha=.01)[1],
+      digits=2,caption="Teacher-report Aggression Scale",
+      col.names=c("1","3","5","10","12","14","16","18"))
+
+kable(corr.test(data_wide[,31:38],adjust="bonferroni",alpha=.01)[1],
+      digits=2,caption="Parent-report Prosocial Scale",
+      col.names=c("1","3","5","10","12","14","16","18"))
+
+kable(corr.test(data_wide[,55:62],adjust="bonferroni",alpha=.01)[1],
+      digits=2,caption="Teacher-report Prosocial Scale",
+      col.names=c("1","3","5","10","12","14","16","18"))
 ```
