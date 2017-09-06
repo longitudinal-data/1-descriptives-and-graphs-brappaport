@@ -32,14 +32,28 @@ data_long$wave <- as.integer(data_long$wave)
 
 # Question 3
 ```{r Question 3}
-samplesize_wave <- matrix(ncol=3,nrow=8)
+samplesize_wave <- matrix(ncol=7,nrow=8)
 samplesize_wave <- as.data.frame(samplesize_wave)
-colnames(samplesize_wave) <-c("Wave","Parent-report","Teacher-report")
+colnames(samplesize_wave) <-c("Wave","Parent-report","Teacher-report",
+                              "Parent-report","Teacher-report",
+                              "Parent-report","Teacher-report")
 
 samplesize_wave[,1:2] <- aggregate(PPeerScale ~ wave, data=data_long, 
-                                   function(x) {sum(!is.na(x))}, na.action = NULL)
+                                   function(x) {sum(!is.na(x))}, na.action=NULL)
 samplesize_wave[,3] <- aggregate(TPeerScale ~ wave, data=data_long, 
-                                 function(x) {sum(!is.na(x))}, na.action = NULL)[2]
+                                 function(x) {sum(!is.na(x))}, na.action=NULL)[2]
+samplesize_wave[,4] <- aggregate(PAggScale ~ wave, data=data_long, 
+                                   function(x) {sum(!is.na(x))}, na.action=NULL)[2]
+samplesize_wave[,5] <- aggregate(TAggScale ~ wave, data=data_long, 
+                                 function(x) {sum(!is.na(x))}, na.action=NULL)[2]
+samplesize_wave[,6] <- aggregate(PProScale ~ wave, data=data_long, 
+                                   function(x) {sum(!is.na(x))}, na.action=NULL)[2]
+samplesize_wave[,7] <- aggregate(TProScale ~ wave, data=data_long, 
+                                 function(x) {sum(!is.na(x))}, na.action=NULL)[2]
+
+kable(samplesize_wave,"html") %>%
+  kable_styling("striped") %>%
+  add_header_above(c(" "=1,"Peer Scale"=2,"Aggression Scale"=2,"Prosocial Scale"=2))
 ```
 
 # Question 4
