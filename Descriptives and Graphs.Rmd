@@ -20,6 +20,7 @@ data_wide <- read.csv("/Users/BrentRappaport/Box Sync/WashU/Classes/Longtudinal 
 ```
 
 # Question 1 & 2
+Move data from wide to long.
 ```{r long data}
 data_long <- data_wide %>% 
   gather(c(-ID,-sex,-T1_ACES_sum,-ethin,-T1Income_to_Need,-IQ), 
@@ -31,6 +32,7 @@ data_long$wave <- as.integer(data_long$wave)
 ```
 
 # Question 3
+N for each wave
 ```{r Question 3}
 samplesize_wave <- matrix(ncol=7,nrow=8)
 samplesize_wave <- as.data.frame(samplesize_wave)
@@ -57,6 +59,7 @@ kable(samplesize_wave,"html") %>%
 ```
 
 # Question 4
+Convert age in years to age in days.
 ```{r Question 4}
 data_long$age_days <- data_long$age*365
 ```
