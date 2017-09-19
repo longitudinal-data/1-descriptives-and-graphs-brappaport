@@ -16,6 +16,17 @@ library(psych)
 library(lme4)
 library(broom)
 library(merTools)
+library(foreach)
+
+data_wide <- read.csv("/Users/BrentRappaport/Box Sync/WashU/Classes/Longtudinal Methods/1-descriptives-and-graphs-brappaport/Rappaport_data.csv")
+
+data_long <- data_wide %>% 
+  gather(c(-ID,-sex,-T1_ACES_sum,-ethin,-T1Income_to_Need,-IQ), 
+         key = "time", value = "value") %>% 
+  separate(time, into = c("variable", "wave")) %>%
+  spread(variable,value)
+
+data_long$wave <- as.integer(data_long$wave)
 ```
 
 
@@ -53,16 +64,71 @@ The esimates of the fixed effect for the Intercept doesn't change much, however 
 print(c(sigma(model2),sigma(model3)))
 ```
 The residual standard error (sigma here), doesn't change much between the two models, but does decrease when age is introduced as a fixed effect.
+
 ```{r Question 3 cont2}
-plot3_table <- FEsim(model3)
+plot3_table <- FEsim(model2)
+plot3_table[2:3,] <- FEsim(model3)
+plot3_table[1] <- c("Model2 Intercept","Model3 Intercept","Model3 Age")
+
 plot3_table$ci <- 1.96*plot3_table$sd
 
 ggplot(plot3_table,aes(x=term,y=mean)) +
   geom_point() +
-  geom_errorbar(ymin=mean-ci,ymax=mean+ci)
-
-
-  theme(text=element_text(lineheight=1, face="bold", size=15), 
-        legend.position="none")
+  geom_errorbar(aes(ymin=mean-ci,ymax=mean+ci),width=0.2)
 ```
 
+# Question 4
+```{r Question 4}
+model4 <- lmer(PPeerScale ~ age + (age | ID), data=data_long)
+print(c(sigma(model3),sigma(model4)))
+anova(model3,model4)
+```
+Adding the random slope improves fit, according to the AIC, BIC, and likelihood ratio test, while also considerably lowering the residual standard error (from `r sigma(model3)` to `r sigma(model4)`).
+
+# Question 5
+```{r Question 5}
+summary(model4)
+```
+The correlation means that there is a negative correlation between the intercept and the slope, such that the lower the intercept, the higher the slope will be.
+
+# Question 6
+```{r Question 6}
+model4_re.sim <- REsim(model4)
+p1.gg <- model4_re.sim %>% 
+  filter(term == c("(Intercept)","age")) 
+
+# Intercept
+ggplot(p1.gg[p1.gg$term %in% "(Intercept)",], aes(mean)) +
+  geom_density()
+
+# Age
+ggplot(p1.gg[p1.gg$term %in% "age",], aes(mean)) +
+  geom_density()
+```
+
+# Question 7
+```{r Question 7}
+plotREsim(model4_re.sim)
+```
+No, there are no obvious outliers in terms of unusually large standard errors around the intercept or slopes.
+
+# Question 8
+```{r Question 8}
+PT <- predictInterval(merMod=model4, newdata=data_long, level=0.9, n.sims=100, stat="mean", 
+                      include.resid.var=TRUE)
+PT_plot <- data_long; PT_plot[,15:17] <- PT
+
+#example graph using ONLY FIRST 10 participants and fitted scores with confidence bands
+ggplot(PT_plot[1:80,],aes(age,fit,group=ID)) +
+  geom_line(alpha=0.6) +
+  stat_smooth(aes(group=1),method="lm", color="sky blue") +
+  geom_ribbon(aes(ymin=lwr,ymax=upr),linetype=2,alpha=0.1) +
+  labs(x="Age",y="fitted Parent-report Peer Scale Score")
+
+#graphed using ALL participants and fitted scores with confidence bands
+ggplot(PT_plot,aes(age,fit,group=ID)) +
+  geom_line(alpha=0.6) +
+  stat_smooth(aes(group=1),method="lm", color="sky blue") +
+  geom_ribbon(aes(ymin=lwr,ymax=upr),linetype=2,alpha=0.1) +
+  labs(x="Age",y="fitted Parent-report Peer Scale Score")
+```
