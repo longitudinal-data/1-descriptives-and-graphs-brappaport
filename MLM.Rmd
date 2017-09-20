@@ -1,5 +1,5 @@
 ---
-title: "MLM"
+title: "Homework 2"
 author: "Brent Rappaport"
 date: "September 12, 2017"
 output: pdf_document
@@ -15,9 +15,11 @@ library(ggplot2)
 library(psych)
 library(lme4)
 library(broom)
+library(merTools)
 ```
 
-# Question 2
+
+# Question 1
 ```{r Question 1}
 model1 <- lm(PPeerScale ~ age, data=data_long)
 summary(model1)
@@ -44,5 +46,23 @@ ggplot(model2.aug,aes(.resid,.fitted,group=ID)) +
 ```{r Question 3}
 model3 <- lmer(PPeerScale ~ age + (1 | ID), data=data_long)
 summary(model3)
-
 ```
+The esimates of the fixed effect for the Intercept doesn't change much, however now that age is being included as a fixed effect, we can get a sense of the average change over time in parent reported Peer scores. That is, for ever 1 year, participants increase an average of 0.15 in their score.
+
+```{r Question 3 cont1}
+print(c(sigma(model2),sigma(model3)))
+```
+The residual standard error (sigma here), doesn't change much between the two models, but does decrease when age is introduced as a fixed effect.
+```{r Question 3 cont2}
+plot3_table <- FEsim(model3)
+plot3_table$ci <- 1.96*plot3_table$sd
+
+ggplot(plot3_table,aes(x=term,y=mean)) +
+  geom_point() +
+  geom_errorbar(ymin=mean-ci,ymax=mean+ci)
+
+
+  theme(text=element_text(lineheight=1, face="bold", size=15), 
+        legend.position="none")
+```
+
