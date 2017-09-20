@@ -17,6 +17,7 @@ library(lme4)
 library(broom)
 library(merTools)
 library(foreach)
+library(sjPlot)
 
 data_wide <- read.csv("/Users/BrentRappaport/Box Sync/WashU/Classes/Longtudinal Methods/1-descriptives-and-graphs-brappaport/Rappaport_data.csv")
 
@@ -48,7 +49,7 @@ summary(model2)
 model2.aug <- augment(model2, data_long)
 
 ggplot(model2.aug,aes(.resid,.fitted,group=ID)) +
-  geom_line(alpha=1) +
+  geom_point(alpha=1) +
   theme(text=element_text(lineheight=1, face="bold", size=15), 
         legend.position="none")
 ```
