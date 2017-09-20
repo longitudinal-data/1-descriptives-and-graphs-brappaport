@@ -1,7 +1,7 @@
 ---
 title: "Descriptives and Graphs"
 author: "Brent Rappaport"
-date: "September 2, 2017"
+date: "September 7, 2017"
 output: pdf_document
 ---
 
@@ -126,6 +126,7 @@ ggplot(data_long,aes(age,PPeerScale,group=ID,color=factor(sex))) +
 ```
 
 # Question 7
+Correlations between waves
 ```{r Question 7}
 kable(corr.test(data_wide[,15:22],adjust="bonferroni",alpha=.01)[1],
       digits=2,caption="Parent-report Peer Scale",
