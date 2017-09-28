@@ -23,6 +23,7 @@ library(broom)
 library(merTools)
 library(foreach)
 library(sjPlot)
+library(mltools)
 
 data_wide <- read.csv("/Users/BrentRappaport/Box Sync/WashU/Classes/Longtudinal Methods/1-descriptives-and-graphs-brappaport/Rappaport_data.csv")
 
@@ -46,18 +47,20 @@ data_long$wave <- as.integer(data_long$wave)
 ## Add a nominal covariate into the model (sex)
 
 #Predicting intercept
-model1a <- lmer(PPeerScale ~ sex_01 + (1 | ID), data=data_long)
-summary(model1a)
+model1a <- lmer(PPeerScale ~ age + sex_01 + (age | ID), data=data_long)
+tidy(model1a)
 
 #Predicting intercept and slope
-model1b <- lmer(PPeerScale ~ age + sex_01 + (age | ID), data=data_long)
-summary(model1b)
+model1b <- lmer(PPeerScale ~ age + sex_01 + age:sex_01 + (age | ID), data=data_long)
+tidy(model1b)
 
 #Predicting intercept and slope, with sex centerd
-model1c <- lmer(PPeerScale ~ age + sex_c + (age | ID), data=data_long)
-summary(model1c)
+model1c <- lmer(PPeerScale ~ age + sex_c + age:sex_c + (age | ID), data=data_long)
+tidy(model1c)
+
+model1c_t <- lmer(TPeerScale ~ age + sex_c + age:sex_c + (age | ID), data=data_long)
 ```
-Centering the nominal covariate (sex) did not affect the model at all. However, when time is added into the model, the residual variance is reduced. The estimate for the fixed effect of the covariate (sex) changes in value and interpretation. In model a is it a reflection of the difference of group means, while in model b it is a reflection of the difference the group slopes.
+Centering the nominal covariate (sex) did not affect the model, except for the fixed effect estimate of age. This makes sense, since, with the introduction of the interaction term introduced in model b now means that the fixed effect of age is representative of the predicted change in PPeer (x) for every unit change in age (y), when sex =0. Prior to centering, this then represented the mean change for males (dummy coded as 0), but after centering indicates the average mean change across both genders.
 
 
 # Question 2
@@ -65,65 +68,72 @@ Centering the nominal covariate (sex) did not affect the model at all. However, 
 ## Add a continuous time-invariant covariate into the model (SES=T1Income_to_Need)
 
 #Predicting intercept
-model2a <- lmer(PPeerScale ~ T1Income_to_Need + (1 | ID), data=data_long)
-summary(model2a)
+model2a <- lmer(PPeerScale ~ age + T1Income_to_Need + (age | ID), data=data_long)
+tidy(model2a)
 
 #Predicting intercept and slope
-model2b <- lmer(PPeerScale ~ age + T1Income_to_Need + (age | ID), data=data_long)
-summary(model2b)
+model2b <- lmer(PPeerScale ~ age + T1Income_to_Need + age:T1Income_to_Need + (age | ID), data=data_long)
+tidy(model2b)
 
 #Predicting intercept and slope, with SES centerd
-model2c <- lmer(PPeerScale ~ age + T1Income_to_Need_c + (age | ID), data=data_long)
-summary(model2c)
+model2c <- lmer(PPeerScale ~ age + T1Income_to_Need_c + age:T1Income_to_Need_c + (age | ID), data=data_long)
+tidy(model2c)
+
+model2c_t <- lmer(TPeerScale ~ age + T1Income_to_Need_c + age:T1Income_to_Need_c + (age | ID),
+                  data=data_long)
 ```
-The fixed effect of the intercept changed from model b to c, since not it reflects the mean SES, rather than reflecting the PPeer score when SES=0.
+Centering the covariate affected the Intercept and age fixed effects estimates, since (similar to above), they go from being interpreted as the average intercept and average change in PPeer with age of the male group to the average intercept and change in PPeer with age of all subjects.
 
 
 # Question 3
 ```{r Question 3}
-model1c_aug <- augment(model1c)
-model2c_aug <- augment(model2c)
+sjp.lmer(model1c, type="pred", facet.grid=F,
+         vars = c("age", "sex_c"))
 
-ggplot(model1c_aug, aes(x= age, y = .fitted, color=factor(sex_c))) + 
-  geom_point() + 
-  stat_smooth(aes(group=factor(sex_c)),method="lm")
-  
-ggplot(model2c_aug, aes(x= age, y = .fitted, color=T1Income_to_Need_c)) + 
-  geom_point() + 
-  stat_smooth(aes(group=T1Income_to_Need_c),method="lm")
+sjp.lmer(model1c_t, type="pred", facet.grid=F,
+         vars = c("age", "sex_c"))
+
+sjp.int(model2c, 
+        type = "eff",
+        mdrt.values = "quart",
+        swap.pred=T,
+        p.value=.05)
+
+sjp.int(model2c_t, 
+        type = "eff",
+        mdrt.values = "quart",
+        swap.pred=T,
+        p.value=.05)
 ```
 
 
 # Question 4
 ```{r Question 4}
-model1_CI <- matrix(ncol=4,nrow=2)
-colnames(model1_CI) <- c("","Lower_CI","Estimate","Upper_CI")
-model1_CI[,1] <- c("Intercept","Slope") 
-model1_CI <- as.data.frame(model1_CI)
+model1c_ci <- confint(model1c, level=.95, oldNames=F, method="boot", nsim=100)
+model1c_ci[c(1,3,5:8),]
 
-model1c_tidy <- tidy(model1c)
-model1_CI[1,2:4] <- c(model1c_tidy[1,2]-1.96*model1c_tidy[4,2],model1c_tidy[1,2],model1c_tidy[1,2]+1.96*model1c_tidy[4,2])
-model1_CI[2,2:4] <- c(model1c_tidy[2,2]-1.96*model1c_tidy[5,2],model1c_tidy[2,2],model1c_tidy[2,2]+1.96*model1c_tidy[5,2])
-
-kable(model1_CI,digits=2)
-
-model2_CI <- matrix(ncol=4,nrow=2)
-colnames(model2_CI) <- c("","Lower_CI","Estimate","Upper_CI")
-model2_CI[,1] <- c("Intercept","Slope") 
-model2_CI <- as.data.frame(model2_CI)
-
-model2c_tidy <- tidy(model2c)
-model2_CI[1,2:4] <- c(model2c_tidy[1,2]-1.96*model2c_tidy[4,2],model2c_tidy[1,2],model2c_tidy[1,2]+1.96*model2c_tidy[4,2])
-model2_CI[2,2:4] <- c(model2c_tidy[2,2]-1.96*model2c_tidy[5,2],model2c_tidy[2,2],model2c_tidy[2,2]+1.96*model2c_tidy[5,2])
-
-kable(model2_CI,digits=2)
+model2c_ci <- confint(model2c, level=.95, oldNames=F, method="boot", nsim=100)
+model2c_ci[c(1,3,5:8),]
 ```
 
 
 # Question 5
 ```{r Question 5}
-model5 <- lmer(PPeerScale ~ age + T1Income_to_Need_c + sex_c + (age | ID), data=data_long)
-summary(model5)
-summary(model2c)
+model5 <- lmer(PPeerScale ~ age*T1Income_to_Need_c + age*sex_01 + (age | ID), data=data_long)
+model5_t <- lmer(TPeerScale ~ age*T1Income_to_Need_c + age*sex_01 + (age | ID), data=data_long)
+
+tidy(model5)
+tidy(model2c)
+
+sjp.int(model5, 
+        type = "eff",
+        mdrt.values = "quart",
+        swap.pred=T,
+        p.value=.05)
+
+sjp.int(model5_t, 
+        type = "eff",
+        mdrt.values = "quart",
+        swap.pred=T,
+        p.value=.05)
 ```
-Now the random effects are taking into account each participants' sex and SES when determining the variability around the intercept and slope. Since the residual variance actually increases slightly from 31.2204 to 31.228 compared to the model that only includd SES, while the variability around the slope (age) and intercept change minimally, we can determine that sex has a minimal effect on the random effects.
