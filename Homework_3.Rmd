@@ -60,7 +60,7 @@ tidy(model1c)
 
 model1c_t <- lmer(TPeerScale ~ age + sex_c + age:sex_c + (age | ID), data=data_long)
 ```
-Centering the nominal covariate (sex) did not affect the model, except for the fixed effect estimate of age. This makes sense, since, with the introduction of the interaction term introduced in model b now means that the fixed effect of age is representative of the predicted change in PPeer (x) for every unit change in age (y), when sex =0. Prior to centering, this then represented the mean change for males (dummy coded as 0), but after centering indicates the average mean change across both genders.
+Centering the nominal covariate (sex) affected the fixed effect estimate of age. This makes sense, since, with the introduction of the interaction term in model b, now means that the fixed effect of age is representative of the predicted change in PPeer (x) for every unit change in age (y), when sex =0. Prior to centering, this then represented the mean change for males (dummy coded as 0), but after centering indicates the average mean change across both genders.
 
 
 # Question 2
@@ -137,3 +137,4 @@ sjp.int(model5_t,
         swap.pred=T,
         p.value=.05)
 ```
+The fixed effect of sex now represents the difference between males and females at average levels of SES (females scored `r tidy(model5)[4,2]` higher than males). The fixed effect of SES represents the slope (SES and PPeer) of the reference group (males in this case). Age and sex interaction indicates difference of the slope of between males and females, and age and SES interactions represents the change in the slope at different levels of SES(?).
