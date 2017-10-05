@@ -1,0 +1,200 @@
+---
+title: "Tables and Graphs"
+author: "Brent Rappaport"
+date: "October 4, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T, eval = T, cache = T, warning = F, message = F)
+library(psych)
+library(sjPlot)
+library(broom)
+library(lme4)
+library(MuMIn)
+library(merTools)
+library(reghelper)
+library(stargazer)
+library(lsmeans)
+library(multcompView)
+library(plyr)
+library(tidyverse)
+library(papaja)
+library(knitr)
+
+data_wide <- read.csv("/Users/BrentRappaport/Box Sync/WashU/Classes/Longtudinal Methods/1-descriptives-and-graphs-brappaport/Rappaport_data.csv")
+
+data_wide$sex_01 <- data_wide$sex-1
+data_wide$sex_c <- ifelse(data_wide$sex_01==0,"Male","Female")
+data_wide$sex_c <- as.factor(data_wide$sex_c)
+
+data_wide$T1Income_to_Need_c <- scale(data_wide$T1Income_to_Need, center=T, scale=F)
+
+data_wide$age0_1 <- data_wide$age_1 - data_wide$age_1
+data_wide$age0_3 <- data_wide$age_3 - data_wide$age_1
+data_wide$age0_5 <- data_wide$age_5 - data_wide$age_1
+data_wide$age0_10 <- data_wide$age_10 - data_wide$age_1
+data_wide$age0_12 <- data_wide$age_12 - data_wide$age_1
+data_wide$age0_14 <- data_wide$age_14 - data_wide$age_1
+data_wide$age0_16 <- data_wide$age_16 - data_wide$age_1
+data_wide$age0_18 <- data_wide$age_18 - data_wide$age_1
+
+data_long <- data_wide %>% 
+  gather(c(-ID,-sex,-sex_01,-sex_c,-T1_ACES_sum,-ethin,-T1Income_to_Need,-T1Income_to_Need_c,-IQ), 
+         key = "time", value = "value") %>% 
+  separate(time, into = c("variable", "wave")) %>%
+  spread(variable,value)
+
+data_long$wave <- as.integer(data_long$wave)
+```
+
+# Tables
+```{r Tables}
+#code for Tables
+table_fun <- function(model){
+  fixed <- broom::tidy(model) %>% filter(group == "fixed") %>%
+    select(term, estimate) 
+  ## add random effects ##
+  rand <- broom::tidy(model) %>% filter(group != "fixed") %>%
+    select(term, estimate)
+  ## get confidence intervals ##
+  CI <- data.frame(confint.merMod(model, method = "boot", nsim = 10)) %>%
+    mutate(term = rownames(.)) %>% setNames(c("lower", "upper", "term"))
+  
+  ## Get ICC & R2 values ##
+  ICC <- reghelper::ICC(model)
+  R2 <- MuMIn::r.squaredGLMM(model)
+  
+  ## format the fixed effects
+  fixed <- fixed %>% left_join(CI %>% filter(!grepl(".sig", term))) %>%
+    mutate(type = "Fixed Parts")
+  
+  rand <- rand %>%
+    mutate(estimate = ifelse(grepl("cor", term) == T, estimate, estimate^2),
+          term = mapvalues(term, unique(term), 
+           c("$\\tau_{00}$", "$\\tau_{11}$", "$\\tau_{10}$", "$\\hat{\\sigma^2}$"))) %>%
+    left_join(
+      CI %>% filter(grepl(".sig", term)) %>%
+        mutate(term = mapvalues(term, unique(term), 
+            c("$\\tau_{00}$", "$\\tau_{10}$", "$\\tau_{11}$", "$\\hat{\\sigma^2}$")),
+            lower = lower^2, upper = upper^2)) %>%
+    mutate(type = "Random Parts")
+  
+  mod_terms <- tribble(
+    ~term, ~estimate, ~type,
+    "ICC", ICC, "Model Terms",
+    "$R^2_m$", R2[1], "Model Terms",
+    "$R^2_c$", R2[2], "Model Terms"
+  )
+  
+  tab <- fixed %>%
+    full_join(rand) %>%
+    mutate(CI = sprintf("(%.2f, %.2f)", lower, upper)) %>%
+    select(-lower, -upper) %>%
+    full_join(mod_terms) %>%
+    mutate(estimate = sprintf("%.2f", estimate)) %>%
+    dplyr::rename(b = estimate) %>%
+    select(type, everything())
+  return(tab)
+}
+```
+
+```{r Build specific tables}
+#run models with SES as a covariate
+modelP_sex <- lmer(PPeerScale ~ age0 + sex_01 + age0:sex_01 + (age0 | ID), 
+                data=data_long)
+
+modelP_ses <- lmer(PPeerScale ~ age0 + T1Income_to_Need_c + age0:T1Income_to_Need_c + (age0 | ID), 
+                data=data_long)
+
+
+# basically you can run this multiple times and then join the data frames together. 
+# The only trick is that you'll have to change the column names to make sure they are distinct.
+# My favorite way of doing this is with the purrr package in R.
+# So basically, you make a dataframe of your models, which looks like this:
+
+mod.df <- tibble(
+  outcome = c("Model with sex", "Model with ses"), # just plug in whatever name for your outcome
+  mod = c(modelP_sex, modelP_ses) # basically just listing models that correspond to your outcomes
+)
+
+# then you use purrr
+
+mod.df.long <- mod.df %>%
+  mutate(tab = map(mod, table_fun)) %>%
+  unnest(tab, .drop = T) 
+
+table.df <- mod.df.long %>%
+  gather(key = param, value = value, b, CI) %>%
+  unite(param, outcome, param, sep = ".") %>%
+  spread(key = param, value = value) %>%
+  mutate(type = factor(type, levels = c("Fixed Parts", "Random Parts", "Model Terms"))) %>%
+  arrange(type)
+
+# then you can use apa_table or kable + kableExtra to make them pretty
+options(papaja.na_string = " ")
+papaja::apa_table(table.df %>% select(-type), caption = "Multi-Model Table",
+          col_spanners = list(`2 group` = c(2,3), `Continuous` = c(4,5)),
+          stub_indents = list(Fixed = seq(1,8), Random = seq(9,12), `Model Terms` = seq(13,15)),
+          na_string = " ", 
+          col.names = c(" ", rep(c("b", "CI"), times = 2)),
+          align = c("l", rep("c", 6)))
+```
+
+# Graphing
+```{r Graphing}
+#Parent
+
+#Sex
+fixed.frame_sex <- 
+  data.frame(expand.grid(age0 = seq(0,10,2), 
+             groups = c("Male","Female"))) %>%
+  mutate(pred = predict(modelP_sex, newdata = ., re.form = NA))
+
+fixed.frame_sex %>%
+  mutate(age = age0 + 14) %>%
+  ggplot(aes(x = age, y = pred, color = groups)) +
+    geom_line(size = 2) + 
+    lims(y = c(0,4)) +
+    labs(x = "Age", y = "Sensation Seeking Composite",
+         title = "2 Group Time Invariant Conditional Growth Models") +
+    theme_classic() +
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
+
+#SES
+fixed.frame <- data_long %>%
+  summarise(mean = mean(T1Income_to_Need_c, na.rm = T), 
+            sd = sd(T1Income_to_Need_c, na.rm = T))
+
+fixed.frame <- 
+  data.frame(
+    expand.grid(
+      # here, you add values for your time variable and predictors
+      age0 = seq(0,10,2), 
+      T1Income_to_Need_c = c(fixed.frame$mean-fixed.frame$sd,
+                     fixed.frame$mean,
+                     fixed.frame$mean+fixed.frame$sd))) %>%
+  mutate(pred = predict(modelP_ses, newdata = ., re.form = NA))
+
+
+fixed.frame %>%
+  mutate(Weight = factor(T1Income_to_Need_c, levels = unique(T1Income_to_Need_c), 
+                         labels = c("-1SD", "0SD", "1SD")),
+         age = age0 + 4.451782) %>%
+  ggplot(aes(x = age, y = pred, color = Weight)) +
+    geom_line(size = 2) + 
+    labs(x = "Age", y = "Peer Parent-report Composite",
+         title = "Continuous Invariant Conditional Growth Models") +
+    theme_classic() +
+    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          legend.title = element_text(face = "bold", size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
+
+#Teacher
+```
+
+
