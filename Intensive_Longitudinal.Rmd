@@ -1,0 +1,182 @@
+---
+title: "Intensive Longitudinal Analyses"
+author: "Brent Rappaport"
+date: "October 17, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=F)
+rm(list=ls())
+library(psych)
+library(sjPlot)
+library(broom)
+library(lme4)
+library(MuMIn)
+library(merTools)
+library(reghelper)
+library(stargazer)
+library(lsmeans)
+library(multcompView)
+library(plyr)
+library(tidyverse)
+library(papaja)
+library(stringr)
+```
+# Adapted from Isidro's presentation and code
+
+##Load in data
+```{r load data}
+data_wide <- read.csv("/Users/BrentRappaport/Box Sync/WashU/Classes/Longtudinal Methods/1-descriptives-and-graphs-brappaport/Rappaport_data.csv")
+data_wide <- data_wide[,-1]
+
+#Make sex_01 a binary variable where 0=Male and 1=Female
+data_wide$sex_01 <- data_wide$sex-1
+
+#Make sex_c a factor variable
+data_wide$sex_c <- ifelse(data_wide$sex_01==0,"Male","Female")
+data_wide$sex_c <- as.factor(data_wide$sex_c)
+
+#Center SES
+data_wide$T1Income_to_Need_c <- scale(data_wide$T1Income_to_Need, center=T, scale=F)
+
+#Make age0_ a variable of age from beginning of study (relative age to beginning), rather than aboslute age
+data_wide <- data_wide %>%
+  mutate(age0_1 = age_1 - age_1,
+         age0_3 = age_3 - age_1,
+         age0_5 = age_5 - age_1,
+         age0_10 = age_10 - age_1,
+         age0_12 = age_12 - age_1,
+         age0_14 = age_14 - age_1,
+         age0_16 = age_16 - age_1,
+         age0_18 = age_18 - age_1)
+
+#Convert data to long form
+data_long <- data_wide %>% 
+  gather(c(-ID,-sex,-sex_01,-sex_c,-T1_ACES_sum,-ethin,-T1Income_to_Need,-T1Income_to_Need_c,-IQ), 
+         key = "time", value = "value") %>% 
+  separate(time, into = c("variable", "wave")) %>%
+  spread(variable,value)
+
+data_long$wave <- as.integer(data_long$wave)
+data_long <- data_long[order(data_long$ID),] 
+```
+
+##Graph individual trajectories
+```{r Graphs}
+# Generate a random sample because 150 too many for graph below
+set.seed(20)
+Peer_24 <- data_long %>% 
+  select(ID) %>%  
+  distinct %>% 
+  sample_n(24)
+
+Peer_data2 <- left_join(Peer_24, data_long) 
+  # Use left_join to keep all observations for each time point
+  # only for ids that were sampled 
+
+# Fluctuation in peer interactions
+
+ggplot(Peer_data2, aes(age, PPeerScale, group = ID)) + geom_line() + 
+  geom_point() + facet_wrap(~ID) + 
+  xlab("Age") + ylab("Peer Interactions") + 
+  ggtitle("Figure 1. Peer Interactions as a Function of Age") +
+  theme_classic() +
+  theme(legend.position = "none",
+          axis.text = element_text(face = "bold", size = rel(1.2)),
+          axis.title = element_text(face = "bold", size = rel(1.2)),
+          plot.title = element_text(face = "bold", size = rel(1.2), 
+                                    hjust = .5))
+```
+
+##Rescale predictors
+```{r rescaling predictors}
+#Calculate aggregates within a seperate dataframe
+# i.e., Mean for each person across their respective time points
+long_agg <- data_long %>% 
+  group_by(ID) %>%
+  summarize(PPeer_agg = mean(PPeerScale, na.rm = T),
+            TPeer_agg = mean(TPeerScale, na.rm = T),
+            PAgg_agg = mean(PAggScale, na.rm = T),
+            TAgg_agg = mean(TAggScale, na.rm = T),
+            PPro_agg = mean(PProScale, na.rm = T),
+            TPro_agg = mean(TProScale, na.rm = T),
+            MDD_agg = mean(MDDPRP, na.rm = T))
+
+# Merge with original dataset
+## ISSUE WITH MERGING!!
+data_long <- merge(data_long, long_agg, all.x=T)
+
+# Person- and grand mean-center using original and aggregated scores
+data_long <- data_long %>% mutate(PPeer_pc = PPeerScale - PPeer_agg,
+                   TPeer_pc = TPeerScale - TPeer_agg,
+                   PAgg_pc = PAggScale - PAgg_agg,
+                   TAgg_pc = TAggScale - TAgg_agg,
+                   PPro_pc = PProScale - PPro_agg,
+                   TPro_pc = TProScale - TPro_agg,
+                   MDD_pc = MDDPRP - MDD_agg,
+                   ACES_gm = T1_ACES_sum - mean(T1_ACES_sum, na.rm = T),
+                   SES_gm = T1Income_to_Need - mean(T1Income_to_Need, na.rm = T),
+                   IQ_gm = IQ - mean(IQ, na.rm = T))
+  # Subtract person's mean from their raw score to get person-centered 
+  # For ACES, SES, and IQ: grand mean center because they're time-invariant
+
+# Check calculations; should get 'TRUE' if done correctly
+all(data_long$PPeerScale == data_long$PPeerScale_pc + data_long$PPeer_agg, na.rm = T) 
+```
+
+# Separating sources of variance
+```{r Model 1a}
+#Unconditional means model (intercept and time only)
+mod1a <- lmer(PPeerScale ~ age0 + (1 | ID), data_long)
+summary(mod1a)
+ICC(mod1a)
+```
+Model shows that average PPeer score at baseline is 61.13, that increases 0.16 each year.
+ICC indicates that there is slightly more between than within-person variance.
+```{r Model 1b}
+#Concurrent correlation between MDD symptoms and PPeer scores
+mod1b <- lmer(PPeerScale ~ age0 + MDDPRP + (1 | ID), data_long)
+summary(mod1b)
+```
+Intercept (mean at baseline) is mostly unchanged (61.37), as is the slope (0.11 increase in PPeer every year). An increase in MDDPRP predicts a huge decline in PPeer score, of -20.28.
+```{r Model 1c}
+# Now including aggregated (between) person-centered (within) MDD
+mod1c <- lmer(PPeerScale ~ age0 + MDD_agg + MDD_pc + (1 | ID), data_long)
+summary(mod1c)
+```
+NOT WORKING
+
+##Examining predictions from wave to wave
+###Setup data to be lagged
+```{r Lag data}
+data_long %<>% mutate(PPeer_prev = lag(PPeerScale),
+                   MDD_prev = lag(MDDPRP),
+                   PPeer_pc_prev = lag(PPeer_pc),
+                   MDD_pc_prev = lag(MDD_pc),
+                   PPeer_pc_prev2 = lag(PPeer_pc, n = 2),
+                   MDD_pc_prev2 = lag(MDD_pc, n = 2)) %>%
+  select(MDDPRP, MDD_prev, ID, wave, PPeerScale, PPeer_prev, everything())
+data_long$MDD_pc_prev[data_long$wave == 1] <- NA
+data_long$PPeer_pc_prev[data_long$wave == 1] <- NA
+data_long$MDD_pc_prev2[data_long$wave == 1] <- NA
+data_long$PPeer_pc_prev2[data_long$wave == 1] <- NA
+```
+
+##Time-lagged models
+```{r Time-lagged models}
+# Does MDD predict PPeer controlling for previous wave's PPeer?
+mod2a <- lmer(PPeerScale ~ age0 + PPeer_pc_prev + MDD_pc_prev + 
+                (1 | ID), data_long)
+summary(mod2a)
+# Yes, a one unit increase in MDD symptoms results in a average decrease of 15.25 on PPeer.
+
+# What about including both between- and person-centering
+mod2ab <- lmer(PPeerScale ~ age0 + PPeer_pc_prev + MDD_pc_prev + MDD_agg + 
+                 (1 + MDD_pc_prev | ID), data_long)
+summary(mod2ab)
+
+# Correlation between PPeer and pc MDD
+mod2ac <- lmer(MDDPRP ~  MDD_agg + (1 | ID), data_long)
+summary(mod2ac)
+```
