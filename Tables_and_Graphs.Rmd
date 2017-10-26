@@ -2,7 +2,14 @@
 title: "Tables and Graphs"
 author: "Brent Rappaport"
 date: "October 4, 2017"
-output: pdf_document
+output: 
+  pdf_document:
+    keep_tex: yes
+    toc: yes
+    includes:
+            in_header: 
+                header.tex
+
 ---
 
 ```{r setup, include=FALSE}
@@ -20,7 +27,7 @@ library(multcompView)
 library(plyr)
 library(tidyverse)
 library(papaja)
-library(knitr)
+library(stringr)
 
 data_wide <- read.csv("/Users/BrentRappaport/Box Sync/WashU/Classes/Longtudinal Methods/1-descriptives-and-graphs-brappaport/Rappaport_data.csv")
 
@@ -46,6 +53,7 @@ data_long <- data_wide %>%
   spread(variable,value)
 
 data_long$wave <- as.integer(data_long$wave)
+
 ```
 
 # Tables
@@ -94,12 +102,14 @@ table_fun <- function(model){
     full_join(mod_terms) %>%
     mutate(estimate = sprintf("%.2f", estimate)) %>%
     dplyr::rename(b = estimate) %>%
-    select(type, everything())
+    select(type, everything()) ?%>%
+    mutate(term=str_replace(term,"\\_",""))
   return(tab)
 }
+
 ```
 
-```{r Build specific tables}
+```{r Build specific tables, results ='asis'}
 #run models with SES as a covariate
 modelP_sex <- lmer(PPeerScale ~ age0 + sex_01 + age0:sex_01 + (age0 | ID), 
                 data=data_long)
@@ -131,7 +141,7 @@ table.df <- mod.df.long %>%
   mutate(type = factor(type, levels = c("Fixed Parts", "Random Parts", "Model Terms"))) %>%
   arrange(type)
 
-# then you can use apa_table or kable + kableExtra to make them pretty
+# then you can use apa_table
 options(papaja.na_string = " ")
 papaja::apa_table(table.df %>% select(-type), caption = "Multi-Model Table",
           col_spanners = list(`2 group` = c(2,3), `Continuous` = c(4,5)),
@@ -146,23 +156,24 @@ papaja::apa_table(table.df %>% select(-type), caption = "Multi-Model Table",
 #Parent
 
 #Sex
-fixed.frame_sex <- 
-  data.frame(expand.grid(age0 = seq(0,10,2), 
-             groups = c("Male","Female"))) %>%
-  mutate(pred = predict(modelP_sex, newdata = ., re.form = NA))
+#fixed.frame_sex <- 
+#  data.frame(expand.grid(age0 = seq(0,10,2), 
+#             groups = c("Male","Female"))) %>%
+#  mutate(pred = predict(modelP_sex, newdata = ., re.form = NA))
 
-fixed.frame_sex %>%
-  mutate(age = age0 + 14) %>%
-  ggplot(aes(x = age, y = pred, color = groups)) +
-    geom_line(size = 2) + 
-    lims(y = c(0,4)) +
-    labs(x = "Age", y = "Sensation Seeking Composite",
-         title = "2 Group Time Invariant Conditional Growth Models") +
-    theme_classic() +
-    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
-          axis.title = element_text(face = "bold", size = rel(1.2)),
-          legend.title = element_text(face = "bold", size = rel(1.2)),
-          plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
+#fixed.frame_sex %>%
+#  mutate(age = age0 + 14) %>%
+#  ggplot(aes(x = age, y = pred, color = groups)) +
+#    geom_line(size = 2) + 
+#    lims(y = c(0,4)) +
+#    labs(x = "Age", y = "Sensation Seeking Composite",
+#         title = "2 Group Time Invariant Conditional Growth Models") +
+#    theme_classic() +
+#    theme(axis.text = element_text(face = "bold", size = rel(1.2)),
+#          axis.title = element_text(face = "bold", size = rel(1.2)),
+#          legend.title = element_text(face = "bold", size = rel(1.2)),
+#          plot.title = element_text(face = "bold", size = rel(1.2), hjust = .5))
+
 
 #SES
 fixed.frame <- data_long %>%
@@ -196,5 +207,4 @@ fixed.frame %>%
 
 #Teacher
 ```
-
 
