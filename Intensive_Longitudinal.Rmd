@@ -9,6 +9,7 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE, warning=F)
 rm(list=ls())
 library(psych)
+library(tidyverse)
 library(sjPlot)
 library(broom)
 library(lme4)
@@ -19,7 +20,6 @@ library(stargazer)
 library(lsmeans)
 library(multcompView)
 library(plyr)
-library(tidyverse)
 library(papaja)
 library(stringr)
 ```
@@ -59,6 +59,8 @@ data_long <- data_wide %>%
   spread(variable,value)
 
 data_long$wave <- as.integer(data_long$wave)
+
+#sort by id
 data_long <- data_long[order(data_long$ID),] 
 ```
 
@@ -106,6 +108,7 @@ long_agg <- data_long %>%
 # Merge with original dataset
 ## ISSUE WITH MERGING!!
 data_long <- merge(data_long, long_agg, all.x=T)
+#full_join(data_long, long_agg, by = "ID")
 
 # Person- and grand mean-center using original and aggregated scores
 data_long <- data_long %>% mutate(PPeer_pc = PPeerScale - PPeer_agg,
@@ -145,7 +148,7 @@ Intercept (mean at baseline) is mostly unchanged (61.37), as is the slope (0.11 
 mod1c <- lmer(PPeerScale ~ age0 + MDD_agg + MDD_pc + (1 | ID), data_long)
 summary(mod1c)
 ```
-NOT WORKING
+NOT WORKING: too much missing data
 
 ##Examining predictions from wave to wave
 ###Setup data to be lagged
