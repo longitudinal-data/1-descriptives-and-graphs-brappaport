@@ -1,0 +1,658 @@
+---
+title: "SEM"
+author: "Brent Rappaport"
+date: "October 30, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T, eval = T, cache = T, warning = F, message = T)
+rm(list=ls())
+library(psych)
+library(tidyverse)
+library(sjPlot)
+library(broom)
+library(lme4)
+library(lavaan)
+library(lattice)
+library(semPlot)
+```
+
+##Load in data
+```{r load data}
+data_wide <- read.csv("/Users/BrentRappaport/Box Sync/WashU/Classes/Longtudinal Methods/1-descriptives-and-graphs-brappaport/Rappaport_data.csv")
+data_wide <- data_wide[,-1]
+
+#Make sex_01 a binary variable where 0=Male and 1=Female
+data_wide$sex_01 <- data_wide$sex-1
+
+#Make sex_c a factor variable
+data_wide$sex_c <- ifelse(data_wide$sex_01==0,"Male","Female")
+data_wide$sex_c <- as.factor(data_wide$sex_c)
+
+#Center SES
+data_wide$T1Income_to_Need_c <- as.numeric(scale(data_wide$T1Income_to_Need, center=T, scale=F))
+
+#Make age0_ a variable of age from beginning of study (relative age to beginning), rather than aboslute age
+data_wide <- data_wide %>%
+  mutate(age0_1 = age_1 - age_1,
+         age0_3 = age_3 - age_1,
+         age0_5 = age_5 - age_1,
+         age0_10 = age_10 - age_1,
+         age0_12 = age_12 - age_1,
+         age0_14 = age_14 - age_1,
+         age0_16 = age_16 - age_1,
+         age0_18 = age_18 - age_1)
+
+#Convert data to long form
+data_long <- data_wide %>% 
+  gather(c(-ID,-sex,-sex_01,-sex_c,-T1_ACES_sum,-ethin,-T1Income_to_Need,-T1Income_to_Need_c,-IQ), 
+         key = "time", value = "value") %>% 
+  separate(time, into = c("variable", "wave")) %>%
+  spread(variable,value)
+
+data_long$wave <- as.integer(data_long$wave)
+
+#sort by id
+data_long <- data_long[order(data_long$ID),] 
+```
+
+## Question 1
+```{r Question 1 Marker Variable}
+#1. Specify your model: Marker variable approach
+mod.1 <- 'peer =~ PPeerScale_1 + TPeerScale_1
+          aggression =~ PAggScale_1 + TAggScale_1
+          prosocial =~ PProScale_1 + TProScale_1'
+
+#2. Fit the model
+fit.1 <- cfa(mod.1, data=data_wide)
+# other functions include sem, growth, and lavaan. All have different defaults (See below). we will use growth a lot. 
+
+#3. Display the summary output
+summary(fit.1, fit.measures=TRUE)
+```
+
+```{r Question 1 Fixed Factor}
+#Fixed factor approach
+fit.2 <- cfa(mod.1, std.lv=TRUE, data=data_wide)
+
+summary(fit.2, fit.measures=TRUE, standardized=TRUE)
+```
+
+```{r Question 1 Effects Coding}
+#Effects coding approach
+mod.3 <- 'peer =~ NA*PPeerScale_1 + pe1*PPeerScale_1 + pe2*TPeerScale_1
+          aggression =~ NA*PAggScale_1 +a1*PAggScale_1 + a2*TAggScale_1
+          prosocial =~ NA*PProScale_1 + pr1*PProScale_1 + pr2*TProScale_1
+
+     pe1 == 2 - pe2
+     a1 == 2 - a2
+     pr1 == 2 - pr2
+' 
+
+fit.3 <- cfa(mod.3, data=data_wide) 
+summary(fit.3, fit.measures=TRUE, standardized=TRUE) 
+
+anova(fit.1,fit.3)
+```
+Across the three models, the estimates of the latent variables (or the factor loadings) obviously change, but consistently indicate a larger factor loading teacher report onto the latent variable than parent report. The std.all does not change across models, since it is the standardized indicator of how much variance is being accounted for by the latent variable.
+
+In the fixed factor model, the covariance estimates indicate the correlation between the latent variables, here indicating that the Peer and Prosocial variables are highly correlated (0.884), while Peer and Aggression and Aggression and Prosocial are moderately related (0.633 and 0.546, repectively).
+
+The variance estimates for the latent variables also change. In the first model (marker variable approach), the estimates for the latent variables indicate that they are accounting for substantial variance in the scores. In the second model (fixed factor), the variance estimates are fixed to 1, and the variances of the residuals remains unchanged. In the third model (effects coding), the standarized estimates (std.all) are fixed to 1.
+
+
+## Question 2
+The RMSEA is above 0.1 (0.133), indicating a poor fit, however the SRMR is 0.056 indicating an acceptable fit. The CFI and TFI additionally fall below 0.90 at 0.879 and 0.698, respectively, suggesting a less than optimal fit. The model indicates 15 degrees of freedom indicating that is it overidentified (good).
+
+
+## Question 3
+```{r Question 3a}
+#Longitudinal CFA
+mod.4.full <- '
+peer1 =~ PPeerScale_1 + TPeerScale_1
+peer2 =~ PPeerScale_3 + TPeerScale_3
+peer3 =~ PPeerScale_5 + TPeerScale_5
+peer4 =~ PPeerScale_10 + TPeerScale_10
+peer5 =~ PPeerScale_12 + TPeerScale_12
+peer6 =~ PPeerScale_14 + TPeerScale_14
+peer7 =~ PPeerScale_16 + TPeerScale_16
+peer8 =~ PPeerScale_18 + TPeerScale_18
+
+agg1 =~ PAggScale_1 + TAggScale_1
+agg2 =~ PAggScale_3 + TAggScale_3
+agg3 =~ PAggScale_5 + TAggScale_5
+agg4 =~ PAggScale_10 + TAggScale_10
+agg5 =~ PAggScale_12 + TAggScale_12
+agg6 =~ PAggScale_14 + TAggScale_14
+agg7 =~ PAggScale_16 + TAggScale_16
+agg8 =~ PAggScale_18 + TAggScale_18
+
+pro1 =~ PProScale_1 + TProScale_1
+pro2 =~ PProScale_3 + TProScale_3
+pro3 =~ PProScale_5 + TProScale_5
+pro4 =~ PProScale_10 + TProScale_10
+pro5 =~ PProScale_12 + TProScale_12
+pro6 =~ PProScale_14 + TProScale_14
+pro7 =~ PProScale_16 + TProScale_16
+pro8 =~ PProScale_18 + TProScale_18
+
+## correlated residuals across time
+PPeerScale_1 ~~ PPeerScale_3 + PPeerScale_5 + PPeerScale_10 + PPeerScale_12 + PPeerScale_14 +
+PPeerScale_16 + PPeerScale_18
+PPeerScale_3 ~~ PPeerScale_5 + PPeerScale_10 + PPeerScale_12 + PPeerScale_14 +
+PPeerScale_16 + PPeerScale_18
+PPeerScale_5 ~~ PPeerScale_10 + PPeerScale_12 + PPeerScale_14 + PPeerScale_16 + PPeerScale_18
+PPeerScale_10 ~~ PPeerScale_12 + PPeerScale_14 + PPeerScale_16 + PPeerScale_18
+PPeerScale_12 ~~ PPeerScale_14 + PPeerScale_16 + PPeerScale_18
+PPeerScale_14 ~~ PPeerScale_16 + PPeerScale_18
+PPeerScale_16 ~~ PPeerScale_18
+
+TPeerScale_1 ~~ TPeerScale_3 + TPeerScale_5 + TPeerScale_10 + TPeerScale_12 + TPeerScale_14 +
+TPeerScale_16 + TPeerScale_18
+TPeerScale_3 ~~ TPeerScale_5 + TPeerScale_10 + TPeerScale_12 + TPeerScale_14 +
+TPeerScale_16 + TPeerScale_18
+TPeerScale_5 ~~ TPeerScale_10 + TPeerScale_12 + TPeerScale_14 + TPeerScale_16 + TPeerScale_18
+TPeerScale_10 ~~ TPeerScale_12 + TPeerScale_14 + TPeerScale_16 + TPeerScale_18
+TPeerScale_12 ~~ TPeerScale_14 + TPeerScale_16 + TPeerScale_18
+TPeerScale_14 ~~ TPeerScale_16 + TPeerScale_18
+TPeerScale_16 ~~ TPeerScale_18
+
+PAggScale_1 ~~ PAggScale_3 + PAggScale_5 + PAggScale_10 + PAggScale_12 + PAggScale_14 +
+PAggScale_16 + PAggScale_18
+PAggScale_3 ~~ PAggScale_5 + PAggScale_10 + PAggScale_12 + PAggScale_14 +
+PAggScale_16 + PAggScale_18
+PAggScale_5 ~~ PAggScale_10 + PAggScale_12 + PAggScale_14 + PAggScale_16 + PAggScale_18
+PAggScale_10 ~~ PAggScale_12 + PAggScale_14 + PAggScale_16 + PAggScale_18
+PAggScale_12 ~~ PAggScale_14 + PAggScale_16 + PAggScale_18
+PAggScale_14 ~~ PAggScale_16 + PAggScale_18
+PAggScale_16 ~~ PAggScale_18
+
+TAggScale_1 ~~ TAggScale_3 + TAggScale_5 + TAggScale_10 + TAggScale_12 + TAggScale_14 +
+TAggScale_16 + TAggScale_18
+TAggScale_3 ~~ TAggScale_5 + TAggScale_10 + TAggScale_12 + TAggScale_14 +
+TAggScale_16 + TAggScale_18
+TAggScale_5 ~~ TAggScale_10 + TAggScale_12 + TAggScale_14 + TAggScale_16 + TAggScale_18
+TAggScale_10 ~~ TAggScale_12 + TAggScale_14 + TAggScale_16 + TAggScale_18
+TAggScale_12 ~~ TAggScale_14 + TAggScale_16 + TAggScale_18
+TAggScale_14 ~~ TAggScale_16 + TAggScale_18
+TAggScale_16 ~~ TAggScale_18
+
+PProScale_1 ~~ PProScale_3 + PProScale_5 + PProScale_10 + PProScale_12 + PProScale_14 +
+PProScale_16 + PProScale_18
+PProScale_3 ~~ PProScale_5 + PProScale_10 + PProScale_12 + PProScale_14 +
+PProScale_16 + PProScale_18
+PProScale_5 ~~ PProScale_10 + PProScale_12 + PProScale_14 + PProScale_16 + PProScale_18
+PProScale_10 ~~ PProScale_12 + PProScale_14 + PProScale_16 + PProScale_18
+PProScale_12 ~~ PProScale_14 + PProScale_16 + PProScale_18
+PProScale_14 ~~ PProScale_16 + PProScale_18
+PProScale_16 ~~ PProScale_18
+
+TProScale_1 ~~ TProScale_3 + TProScale_5 + TProScale_10 + TProScale_12 + TProScale_14 +
+TProScale_16 + TProScale_18
+TProScale_3 ~~ TProScale_5 + TProScale_10 + TProScale_12 + TProScale_14 +
+TProScale_16 + TProScale_18
+TProScale_5 ~~ TProScale_10 + TProScale_12 + TProScale_14 + TProScale_16 + TProScale_18
+TProScale_10 ~~ TProScale_12 + TProScale_14 + TProScale_16 + TProScale_18
+TProScale_12 ~~ TProScale_14 + TProScale_16 + TProScale_18
+TProScale_14 ~~ TProScale_16 + TProScale_18
+TProScale_16 ~~ TProScale_18
+'
+
+mod.4 <- '
+peer1 =~ PPeerScale_1 + TPeerScale_1
+peer2 =~ PPeerScale_3 + TPeerScale_3
+peer3 =~ PPeerScale_5 + TPeerScale_5
+peer4 =~ PPeerScale_10 + TPeerScale_10
+peer5 =~ PPeerScale_12 + TPeerScale_12
+peer6 =~ PPeerScale_14 + TPeerScale_14
+
+agg1 =~ PAggScale_1 + TAggScale_1
+agg2 =~ PAggScale_3 + TAggScale_3
+agg3 =~ PAggScale_5 + TAggScale_5
+agg4 =~ PAggScale_10 + TAggScale_10
+agg5 =~ PAggScale_12 + TAggScale_12
+agg6 =~ PAggScale_14 + TAggScale_14
+
+pro1 =~ PProScale_1 + TProScale_1
+pro2 =~ PProScale_3 + TProScale_3
+pro3 =~ PProScale_5 + TProScale_5
+pro4 =~ PProScale_10 + TProScale_10
+pro5 =~ PProScale_12 + TProScale_12
+pro6 =~ PProScale_14 + TProScale_14
+
+## correlated residuals across time
+PPeerScale_1 ~~ PPeerScale_3 + PPeerScale_5 + PPeerScale_10 + PPeerScale_12 + PPeerScale_14
+PPeerScale_3 ~~ PPeerScale_5 + PPeerScale_10 + PPeerScale_12 + PPeerScale_14
+PPeerScale_5 ~~ PPeerScale_10 + PPeerScale_12 + PPeerScale_14
+PPeerScale_10 ~~ PPeerScale_12 + PPeerScale_14
+PPeerScale_12 ~~ PPeerScale_14
+
+TPeerScale_1 ~~ TPeerScale_3 + TPeerScale_5 + TPeerScale_10 + TPeerScale_12 + TPeerScale_14
+TPeerScale_3 ~~ TPeerScale_5 + TPeerScale_10 + TPeerScale_12 + TPeerScale_14
+TPeerScale_5 ~~ TPeerScale_10 + TPeerScale_12 + TPeerScale_14
+TPeerScale_10 ~~ TPeerScale_12 + TPeerScale_14
+TPeerScale_12 ~~ TPeerScale_14
+
+PAggScale_1 ~~ PAggScale_3 + PAggScale_5 + PAggScale_10 + PAggScale_12 + PAggScale_14
+PAggScale_3 ~~ PAggScale_5 + PAggScale_10 + PAggScale_12 + PAggScale_14
+PAggScale_5 ~~ PAggScale_10 + PAggScale_12 + PAggScale_14
+PAggScale_10 ~~ PAggScale_12 + PAggScale_14
+PAggScale_12 ~~ PAggScale_14
+
+TAggScale_1 ~~ TAggScale_3 + TAggScale_5 + TAggScale_10 + TAggScale_12 + TAggScale_14
+TAggScale_3 ~~ TAggScale_5 + TAggScale_10 + TAggScale_12 + TAggScale_14
+TAggScale_5 ~~ TAggScale_10 + TAggScale_12 + TAggScale_14
+TAggScale_10 ~~ TAggScale_12 + TAggScale_14
+TAggScale_12 ~~ TAggScale_14
+
+PProScale_1 ~~ PProScale_3 + PProScale_5 + PProScale_10 + PProScale_12 + PProScale_14
+PProScale_3 ~~ PProScale_5 + PProScale_10 + PProScale_12 + PProScale_14
+PProScale_5 ~~ PProScale_10 + PProScale_12 + PProScale_14
+PProScale_10 ~~ PProScale_12 + PProScale_14
+PProScale_12 ~~ PProScale_14
+
+TProScale_1 ~~ TProScale_3 + TProScale_5 + TProScale_10 + TProScale_12 + TProScale_14
+TProScale_3 ~~ TProScale_5 + TProScale_10 + TProScale_12 + TProScale_14
+TProScale_5 ~~ TProScale_10 + TProScale_12 + TProScale_14
+TProScale_10 ~~ TProScale_12 + TProScale_14
+TProScale_12 ~~ TProScale_14
+'
+
+#fit.4 <- cfa(mod.4, data=data_wide, missing="ML", std.lv=TRUE)
+#inspect(fit.4,"cov.lv")
+
+#summary(fit.4, standardized=TRUE, fit.measures=TRUE)
+```
+Received warning that covariance matrix was not positive definite.
+
+```{r Question 3b}
+#Longitudinal cross-lagged model predicting later times by previous times (autoregressive)
+mod.5.full <- '
+##define latent variables
+peer1 =~ L1*PPeerScale_1 + L2*TPeerScale_1
+peer2 =~ L1*PPeerScale_3 + L2*TPeerScale_3
+peer3 =~ L1*PPeerScale_5 + L2*TPeerScale_5
+peer4 =~ L1*PPeerScale_10 + L2*TPeerScale_10
+peer5 =~ L1*PPeerScale_12 + L2*TPeerScale_12
+peer6 =~ L1*PPeerScale_14 + L2*TPeerScale_14
+peer7 =~ L1*PPeerScale_16 + L2*TPeerScale_16
+peer8 =~ L1*PPeerScale_18 + L2*TPeerScale_18
+
+agg1 =~ L1*PAggScale_1 + L2*TAggScale_1
+agg2 =~ L1*PAggScale_3 + L2*TAggScale_3
+agg3 =~ L1*PAggScale_5 + L2*TAggScale_5
+agg4 =~ L1*PAggScale_10 + L2*TAggScale_10
+agg5 =~ L1*PAggScale_12 + L2*TAggScale_12
+agg6 =~ L1*PAggScale_14 + L2*TAggScale_14
+agg7 =~ L1*PAggScale_16 + L2*TAggScale_16
+agg8 =~ L1*PAggScale_18 + L2*TAggScale_18
+
+pro1 =~ L1*PProScale_1 + L2*TProScale_1
+pro2 =~ L1*PProScale_3 + L2*TProScale_3
+pro3 =~ L1*PProScale_5 + L2*TProScale_5
+pro4 =~ L1*PProScale_10 + L2*TProScale_10
+pro5 =~ L1*PProScale_12 + L2*TProScale_12
+pro6 =~ L1*PProScale_14 + L2*TProScale_14
+pro7 =~ L1*PProScale_16 + L2*TProScale_16
+pro8 =~ L1*PProScale_18 + L2*TProScale_18
+
+## free latent variances at later times (only set the scale once)
+peer2 ~~ NA*peer2
+peer3 ~~ NA*peer3
+peer4 ~~ NA*peer4
+peer5 ~~ NA*peer5
+peer6 ~~ NA*peer6
+peer7 ~~ NA*peer7
+peer8 ~~ NA*peer8
+
+agg2 ~~ NA*agg2
+agg3 ~~ NA*agg3
+agg4 ~~ NA*agg4
+agg5 ~~ NA*agg5
+agg6 ~~ NA*agg6
+agg7 ~~ NA*agg7
+agg8 ~~ NA*agg8
+
+pro2 ~~ NA*pro2
+pro3 ~~ NA*pro3
+pro4 ~~ NA*pro4
+pro5 ~~ NA*pro5
+pro6 ~~ NA*pro6
+pro7 ~~ NA*pro7
+pro8 ~~ NA*pro8
+
+peer1 ~~ agg1 + pro1
+agg1 ~~ pro1
+peer2 ~~ agg2 + pro2
+agg2 ~~ pro2
+peer3 ~~ agg3 + pro3
+agg3 ~~ pro3
+peer4 ~~ agg4 + pro4
+agg4 ~~ pro4
+peer5 ~~ agg5 + pro5
+agg5 ~~ pro5
+peer6 ~~ agg6 + pro6
+agg6 ~~ pro6
+peer7 ~~ agg7 + pro7
+agg7 ~~ pro7
+peer8 ~~ agg8 + pro8
+agg8 ~~ pro8
+
+## directional regression paths
+peer2 ~ peer1 + agg1 + pro1
+agg2 ~ peer1 + agg1 + pro1
+pro2 ~ peer1 + agg1 + pro1
+
+peer3 ~ peer2 + agg2 + pro2
+agg3 ~ peer2 + agg2 + pro2
+pro3 ~ peer2 + agg2 + pro2
+
+peer4 ~ peer3 + agg3 + pro3
+agg4 ~ peer3 + agg3 + pro3
+pro4 ~ peer3 + agg3 + pro3
+
+peer5 ~ peer4 + agg4 + pro4
+agg5 ~ peer4 + agg4 + pro4
+pro5 ~ peer4 + agg4 + pro4
+
+peer6 ~ peer5 + agg5 + pro5
+agg6 ~ peer5 + agg5 + pro5
+pro6 ~ peer5 + agg5 + pro5
+
+peer7 ~ peer6 + agg6 + pro6
+agg7 ~ peer6 + agg6 + pro6
+pro7 ~ peer6 + agg6 + pro6
+
+peer8 ~ peer7 + agg7 + pro7
+agg8 ~ peer7 + agg7 + pro7
+pro8 ~ peer7 + agg7 + pro7
+
+## correlated residuals across time
+PPeerScale_1 ~~ PPeerScale_3 + PPeerScale_5 + PPeerScale_10 + PPeerScale_12 + PPeerScale_14 +
+PPeerScale_16 + PPeerScale_18
+PPeerScale_3 ~~ PPeerScale_5 + PPeerScale_10 + PPeerScale_12 + PPeerScale_14 +
+PPeerScale_16 + PPeerScale_18
+PPeerScale_5 ~~ PPeerScale_10 + PPeerScale_12 + PPeerScale_14 + PPeerScale_16 + PPeerScale_18
+PPeerScale_10 ~~ PPeerScale_12 + PPeerScale_14 + PPeerScale_16 + PPeerScale_18
+PPeerScale_12 ~~ PPeerScale_14 + PPeerScale_16 + PPeerScale_18
+PPeerScale_14 ~~ PPeerScale_16 + PPeerScale_18
+PPeerScale_16 ~~ PPeerScale_18
+
+TPeerScale_1 ~~ TPeerScale_3 + TPeerScale_5 + TPeerScale_10 + TPeerScale_12 + TPeerScale_14 +
+TPeerScale_16 + TPeerScale_18
+TPeerScale_3 ~~ TPeerScale_5 + TPeerScale_10 + TPeerScale_12 + TPeerScale_14 +
+TPeerScale_16 + TPeerScale_18
+TPeerScale_5 ~~ TPeerScale_10 + TPeerScale_12 + TPeerScale_14 + TPeerScale_16 + TPeerScale_18
+TPeerScale_10 ~~ TPeerScale_12 + TPeerScale_14 + TPeerScale_16 + TPeerScale_18
+TPeerScale_12 ~~ TPeerScale_14 + TPeerScale_16 + TPeerScale_18
+TPeerScale_14 ~~ TPeerScale_16 + TPeerScale_18
+TPeerScale_16 ~~ TPeerScale_18
+
+PAggScale_1 ~~ PAggScale_3 + PAggScale_5 + PAggScale_10 + PAggScale_12 + PAggScale_14 +
+PAggScale_16 + PAggScale_18
+PAggScale_3 ~~ PAggScale_5 + PAggScale_10 + PAggScale_12 + PAggScale_14 +
+PAggScale_16 + PAggScale_18
+PAggScale_5 ~~ PAggScale_10 + PAggScale_12 + PAggScale_14 + PAggScale_16 + PAggScale_18
+PAggScale_10 ~~ PAggScale_12 + PAggScale_14 + PAggScale_16 + PAggScale_18
+PAggScale_12 ~~ PAggScale_14 + PAggScale_16 + PAggScale_18
+PAggScale_14 ~~ PAggScale_16 + PAggScale_18
+PAggScale_16 ~~ PAggScale_18
+
+TAggScale_1 ~~ TAggScale_3 + TAggScale_5 + TAggScale_10 + TAggScale_12 + TAggScale_14 +
+TAggScale_16 + TAggScale_18
+TAggScale_3 ~~ TAggScale_5 + TAggScale_10 + TAggScale_12 + TAggScale_14 +
+TAggScale_16 + TAggScale_18
+TAggScale_5 ~~ TAggScale_10 + TAggScale_12 + TAggScale_14 + TAggScale_16 + TAggScale_18
+TAggScale_10 ~~ TAggScale_12 + TAggScale_14 + TAggScale_16 + TAggScale_18
+TAggScale_12 ~~ TAggScale_14 + TAggScale_16 + TAggScale_18
+TAggScale_14 ~~ TAggScale_16 + TAggScale_18
+TAggScale_16 ~~ TAggScale_18
+
+PProScale_1 ~~ PProScale_3 + PProScale_5 + PProScale_10 + PProScale_12 + PProScale_14 +
+PProScale_16 + PProScale_18
+PProScale_3 ~~ PProScale_5 + PProScale_10 + PProScale_12 + PProScale_14 +
+PProScale_16 + PProScale_18
+PProScale_5 ~~ PProScale_10 + PProScale_12 + PProScale_14 + PProScale_16 + PProScale_18
+PProScale_10 ~~ PProScale_12 + PProScale_14 + PProScale_16 + PProScale_18
+PProScale_12 ~~ PProScale_14 + PProScale_16 + PProScale_18
+PProScale_14 ~~ PProScale_16 + PProScale_18
+PProScale_16 ~~ PProScale_18
+
+TProScale_1 ~~ TProScale_3 + TProScale_5 + TProScale_10 + TProScale_12 + TProScale_14 +
+TProScale_16 + TProScale_18
+TProScale_3 ~~ TProScale_5 + TProScale_10 + TProScale_12 + TProScale_14 +
+TProScale_16 + TProScale_18
+TProScale_5 ~~ TProScale_10 + TProScale_12 + TProScale_14 + TProScale_16 + TProScale_18
+TProScale_10 ~~ TProScale_12 + TProScale_14 + TProScale_16 + TProScale_18
+TProScale_12 ~~ TProScale_14 + TProScale_16 + TProScale_18
+TProScale_14 ~~ TProScale_16 + TProScale_18
+TProScale_16 ~~ TProScale_18
+'
+
+mod.5 <- '
+##define latent variables
+peer1 =~ L1*PPeerScale_1 + L2*TPeerScale_1
+peer2 =~ L1*PPeerScale_3 + L2*TPeerScale_3
+peer3 =~ L1*PPeerScale_5 + L2*TPeerScale_5
+peer4 =~ L1*PPeerScale_10 + L2*TPeerScale_10
+peer5 =~ L1*PPeerScale_12 + L2*TPeerScale_12
+peer6 =~ L1*PPeerScale_14 + L2*TPeerScale_14
+
+agg1 =~ L1*PAggScale_1 + L2*TAggScale_1
+agg2 =~ L1*PAggScale_3 + L2*TAggScale_3
+agg3 =~ L1*PAggScale_5 + L2*TAggScale_5
+agg4 =~ L1*PAggScale_10 + L2*TAggScale_10
+agg5 =~ L1*PAggScale_12 + L2*TAggScale_12
+agg6 =~ L1*PAggScale_14 + L2*TAggScale_14
+
+pro1 =~ L1*PProScale_1 + L2*TProScale_1
+pro2 =~ L1*PProScale_3 + L2*TProScale_3
+pro3 =~ L1*PProScale_5 + L2*TProScale_5
+pro4 =~ L1*PProScale_10 + L2*TProScale_10
+pro5 =~ L1*PProScale_12 + L2*TProScale_12
+pro6 =~ L1*PProScale_14 + L2*TProScale_14
+
+## free latent variances at later times (only set the scale once)
+peer2 ~~ NA*peer2
+peer3 ~~ NA*peer3
+peer4 ~~ NA*peer4
+peer5 ~~ NA*peer5
+peer6 ~~ NA*peer6
+
+agg2 ~~ NA*agg2
+agg3 ~~ NA*agg3
+agg4 ~~ NA*agg4
+agg5 ~~ NA*agg5
+agg6 ~~ NA*agg6
+
+pro2 ~~ NA*pro2
+pro3 ~~ NA*pro3
+pro4 ~~ NA*pro4
+pro5 ~~ NA*pro5
+pro6 ~~ NA*pro6
+
+peer1 ~~ agg1 + pro1
+agg1 ~~ pro1
+peer2 ~~ agg2 + pro2
+agg2 ~~ pro2
+peer3 ~~ agg3 + pro3
+agg3 ~~ pro3
+peer4 ~~ agg4 + pro4
+agg4 ~~ pro4
+peer5 ~~ agg5 + pro5
+agg5 ~~ pro5
+peer6 ~~ agg6 + pro6
+agg6 ~~ pro6
+
+## directional regression paths
+peer2 ~ peer1 + agg1 + pro1
+agg2 ~ peer1 + agg1 + pro1
+pro2 ~ peer1 + agg1 + pro1
+
+peer3 ~ peer2 + agg2 + pro2
+agg3 ~ peer2 + agg2 + pro2
+pro3 ~ peer2 + agg2 + pro2
+
+peer4 ~ peer3 + agg3 + pro3
+agg4 ~ peer3 + agg3 + pro3
+pro4 ~ peer3 + agg3 + pro3
+
+peer5 ~ peer4 + agg4 + pro4
+agg5 ~ peer4 + agg4 + pro4
+pro5 ~ peer4 + agg4 + pro4
+
+peer6 ~ peer5 + agg5 + pro5
+agg6 ~ peer5 + agg5 + pro5
+pro6 ~ peer5 + agg5 + pro5
+
+## correlated residuals across time
+PPeerScale_1 ~~ PPeerScale_3 + PPeerScale_5 + PPeerScale_10 + PPeerScale_12 + PPeerScale_14
+PPeerScale_3 ~~ PPeerScale_5 + PPeerScale_10 + PPeerScale_12 + PPeerScale_14
+PPeerScale_5 ~~ PPeerScale_10 + PPeerScale_12 + PPeerScale_14
+PPeerScale_10 ~~ PPeerScale_12 + PPeerScale_14
+PPeerScale_12 ~~ PPeerScale_14
+
+TPeerScale_1 ~~ TPeerScale_3 + TPeerScale_5 + TPeerScale_10 + TPeerScale_12 + TPeerScale_14
+TPeerScale_3 ~~ TPeerScale_5 + TPeerScale_10 + TPeerScale_12 + TPeerScale_14
+TPeerScale_5 ~~ TPeerScale_10 + TPeerScale_12 + TPeerScale_14
+TPeerScale_10 ~~ TPeerScale_12 + TPeerScale_14
+TPeerScale_12 ~~ TPeerScale_14
+
+PAggScale_1 ~~ PAggScale_3 + PAggScale_5 + PAggScale_10 + PAggScale_12 + PAggScale_14
+PAggScale_3 ~~ PAggScale_5 + PAggScale_10 + PAggScale_12 + PAggScale_14
+PAggScale_5 ~~ PAggScale_10 + PAggScale_12 + PAggScale_14
+PAggScale_10 ~~ PAggScale_12 + PAggScale_14
+PAggScale_12 ~~ PAggScale_14
+
+TAggScale_1 ~~ TAggScale_3 + TAggScale_5 + TAggScale_10 + TAggScale_12 + TAggScale_14
+TAggScale_3 ~~ TAggScale_5 + TAggScale_10 + TAggScale_12 + TAggScale_14
+TAggScale_5 ~~ TAggScale_10 + TAggScale_12 + TAggScale_14
+TAggScale_10 ~~ TAggScale_12 + TAggScale_14
+TAggScale_12 ~~ TAggScale_14
+
+PProScale_1 ~~ PProScale_3 + PProScale_5 + PProScale_10 + PProScale_12 + PProScale_14
+PProScale_3 ~~ PProScale_5 + PProScale_10 + PProScale_12 + PProScale_14
+PProScale_5 ~~ PProScale_10 + PProScale_12 + PProScale_14
+PProScale_10 ~~ PProScale_12 + PProScale_14
+PProScale_12 ~~ PProScale_14
+
+TProScale_1 ~~ TProScale_3 + TProScale_5 + TProScale_10 + TProScale_12 + TProScale_14
+TProScale_3 ~~ TProScale_5 + TProScale_10 + TProScale_12 + TProScale_14
+TProScale_5 ~~ TProScale_10 + TProScale_12 + TProScale_14
+TProScale_10 ~~ TProScale_12 + TProScale_14
+TProScale_12 ~~ TProScale_14
+'
+
+#fit.5 <- sem(mod.5, data=data_wide, missing = "FIML", std.lv=TRUE)
+#summary(fit.5, standardized=TRUE, fit.measures=TRUE)
+```
+Converged (but again had to remove the last 2 time points)! It shows a poor fit, but only used 39/306 observations!! When I reran it using FIML for missing data, it ran into an error.
+
+```{r Question 4}
+#Longitudinal growth model with a fixed slope
+mod.6.fixed <- ' i =~ 1*PPeerScale_1 + 1*PPeerScale_3 + 1*PPeerScale_5 +  1*PPeerScale_10 + 1*PPeerScale_12 + 
+                        1*PPeerScale_14 + 1*PPeerScale_16 + 1*PPeerScale_18
+                 s =~ 0*PPeerScale_1 + 1*PPeerScale_3 + 2*PPeerScale_5 +  3*PPeerScale_10 + 4*PPeerScale_12 + 
+                        5*PPeerScale_14 + 6*PPeerScale_16 + 7*PPeerScale_18
+
+                 s ~~ 0*s #fixed slopes, no variance'
+fit.6.fixed <- growth(mod.6.fixed, missing = "ML", data = data_wide)
+inspect(fit.6.fixed, "cov.lv")
+#slope is 0.000
+
+#Longitudinal growth model with a random slope
+mod.6.random <- ' i =~ 1*PPeerScale_1 + 1*PPeerScale_3 + 1*PPeerScale_5 +  1*PPeerScale_10 + 1*PPeerScale_12 + 
+                        1*PPeerScale_14 + 1*PPeerScale_16 + 1*PPeerScale_18
+                  s =~ 0*PPeerScale_1 + 2*PPeerScale_3 + 4*PPeerScale_5 +  9*PPeerScale_10 + 11*PPeerScale_12 + 
+                        13*PPeerScale_14 + 15*PPeerScale_16 + 17*PPeerScale_18'
+fit.6.random <- growth(mod.6.random, missing = "FIML", data = data_wide)
+
+
+#Calculate a more precise time metric
+apply(data_wide[,82:89], 2, mean, na.rm=T)
+
+#Longitudinal growth model with a random slope and more precise time metric
+mod.6.precise <- ' i =~ 1*PPeerScale_1 + 1*PPeerScale_3 + 1*PPeerScale_5 +  1*PPeerScale_10 + 1*PPeerScale_12 + 
+                        1*PPeerScale_14 + 1*PPeerScale_16 + 1*PPeerScale_18
+                  s =~ 0*PPeerScale_1 + 1.022622*PPeerScale_3 + 2.012532*PPeerScale_5 +  4.597019*PPeerScale_10 +
+                        5.724867*PPeerScale_12 + 6.709552*PPeerScale_14 + 7.955476*PPeerScale_16 + 
+                        9.164656*PPeerScale_18'
+fit.6.precise <- growth(mod.6.precise, missing = "FIML", data = data_wide)
+
+#Mulitlevel model with a random slope
+mod.6.MLM <- lmer(PPeerScale ~ age0 + (age0 | ID), data_long)
+summary(mod.6.MLM)
+summary(fit.6.precise)
+```
+The mean estimate from the growth model (intercept= 61.337, and slope= 0.121) differs slightly from the fixed effects of the multilevel model (intercept= 61.1291, slope= 0.1551). The variance of the growth model (intercept= 49.535, slope= 0.826), also differs slightly from the random effect of the multilevel model (intercept= 43.36, slope= 0.8674).
+
+
+## Question 5
+```{r Question 5}
+#Longitudinal growth model with a random slope, constraining residual variances to 0
+mod.7 <- ' i =~ 1*PPeerScale_1 + 1*PPeerScale_3 + 1*PPeerScale_5 +  1*PPeerScale_10 + 1*PPeerScale_12 + 
+                        1*PPeerScale_14 + 1*PPeerScale_16 + 1*PPeerScale_18
+                  s =~ 0*PPeerScale_1 + 2*PPeerScale_3 + 4*PPeerScale_5 +  9*PPeerScale_10 + 11*PPeerScale_12 + 
+                        13*PPeerScale_14 + 15*PPeerScale_16 + 17*PPeerScale_18
+
+PPeerScale_1 ~~ 0*PPeerScale_1
+PPeerScale_3 ~~ 0*PPeerScale_3
+PPeerScale_5 ~~ 0*PPeerScale_5
+PPeerScale_10 ~~ 0*PPeerScale_10
+PPeerScale_12 ~~ 0*PPeerScale_12
+PPeerScale_14 ~~ 0*PPeerScale_14
+PPeerScale_16 ~~ 0*PPeerScale_16
+PPeerScale_18 ~~ 0*PPeerScale_18
+'
+#fit.7 <- growth(mod.7, missing="ML", data=data_wide)
+#inspect(fit.7, "cov.lv")
+```
+Model won't run.
+
+
+## Question 6
+```{r Question 6}
+#Longitudinal growth model with a fixed slope
+mod.6.fixed <- ' i =~ 1*PPeerScale_1 + 1*PPeerScale_3 + 1*PPeerScale_5 +  1*PPeerScale_10 + 1*PPeerScale_12 + 
+                        1*PPeerScale_14 + 1*PPeerScale_16 + 1*PPeerScale_18
+                 s =~ 0*PPeerScale_1 + 2*PPeerScale_3 + 4*PPeerScale_5 +  9*PPeerScale_10 + 11*PPeerScale_12 + 
+                        13*PPeerScale_14 + 15*PPeerScale_16 + 17*PPeerScale_18
+
+                 s ~~ 0*s #fixed slopes, no variance'
+fit.6.fixed <- growth(mod.6.fixed, missing = "ML", data = data_wide)
+inspect(fit.6.fixed, "cov.lv")
+#slope-slope covariance is 0.000
+```
+Model won't run.
+
+
+## Question 7
+```{r Question 7}
+#Longitudinal growth model with a random slope, with a different time metric
+mod.6.centered <- ' i =~ 1*PPeerScale_1 + 1*PPeerScale_3 + 1*PPeerScale_5 +  1*PPeerScale_10 + 1*PPeerScale_12 + 
+                        1*PPeerScale_14 + 1*PPeerScale_16 + 1*PPeerScale_18
+                  s =~ -3*PPeerScale_1 + -2*PPeerScale_3 + -1*PPeerScale_5 +  0*PPeerScale_10 + 1*PPeerScale_12 + 
+                        2*PPeerScale_14 + 3*PPeerScale_16 + 4*PPeerScale_18'
+fit.6.centered <- growth(mod.6.centered, missing = "FIML", data = data_wide)
+
+summary(fit.6.centered)
+summary(fit.6.random)
+```
+The mean estimates of the intercept and slope changes slightly, since 0 now indicates the mean at the 4th wave rather than the 1st wave. The variance for the intercept and slope also changed slightly, as does the covariance between the intercept and slope. It does not seem to affect the fit statistics though.
+
+
+## Question 8
+```{r Question 8}
+fit.8.precise <- growth(mod.6.precise, missing = "FIML", estimator = "MLR", data = data_wide)
+summary(fit.8.precise)
+summary(fit.6.precise)
+```
+Changing the estimator to MLR seemed to only add to the fit statistics, adding an extra "Robust" column to indicate the robust goodness of fit.
+
+## Question 9
+```{r Question 9}
+semPaths(fit.1, what="std")
+semPaths(fit.3, what="std")
+semPaths(fit.8.precise, what="std")
+```
