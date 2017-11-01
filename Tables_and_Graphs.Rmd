@@ -3,7 +3,7 @@ title: "Tables and Graphs"
 author: "Brent Rappaport"
 date: "October 4, 2017"
 output: 
-  pdf_document:
+  html_document:
     keep_tex: yes
     toc: yes
     includes:
@@ -102,8 +102,8 @@ table_fun <- function(model){
     full_join(mod_terms) %>%
     mutate(estimate = sprintf("%.2f", estimate)) %>%
     dplyr::rename(b = estimate) %>%
-    select(type, everything()) ?%>%
-    mutate(term=str_replace(term,"\\_",""))
+    select(type, everything()) %>%
+    mutate(term=str_replace(term,"_","")) ##this might be what is causing the problem
   return(tab)
 }
 
