@@ -1,0 +1,119 @@
+---
+title: "Lavaan Practice"
+author: "Brent Rappaport"
+date: "October 26, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(psych)
+library(tidyverse)
+library(sjPlot)
+library(broom)
+library(lme4)
+library(lavaan)
+library(lattice)
+```
+
+##Load in data
+```{r load data}
+data_wide <- read.csv("/Users/BrentRappaport/Box Sync/WashU/Classes/Longtudinal Methods/1-descriptives-and-graphs-brappaport/Rappaport_data.csv")
+data_wide <- data_wide[,-1]
+
+#Make sex_01 a binary variable where 0=Male and 1=Female
+data_wide$sex_01 <- data_wide$sex-1
+
+#Make sex_c a factor variable
+data_wide$sex_c <- ifelse(data_wide$sex_01==0,"Male","Female")
+data_wide$sex_c <- as.factor(data_wide$sex_c)
+
+#Center SES
+data_wide$T1Income_to_Need_c <- scale(data_wide$T1Income_to_Need, center=T, scale=F)
+
+#Make age0_ a variable of age from beginning of study (relative age to beginning), rather than aboslute age
+data_wide <- data_wide %>%
+  mutate(age0_1 = age_1 - age_1,
+         age0_3 = age_3 - age_1,
+         age0_5 = age_5 - age_1,
+         age0_10 = age_10 - age_1,
+         age0_12 = age_12 - age_1,
+         age0_14 = age_14 - age_1,
+         age0_16 = age_16 - age_1,
+         age0_18 = age_18 - age_1)
+
+#Convert data to long form
+data_long <- data_wide %>% 
+  gather(c(-ID,-sex,-sex_01,-sex_c,-T1_ACES_sum,-ethin,-T1Income_to_Need,-T1Income_to_Need_c,-IQ), 
+         key = "time", value = "value") %>% 
+  separate(time, into = c("variable", "wave")) %>%
+  spread(variable,value)
+
+data_long$wave <- as.integer(data_long$wave)
+
+#sort by id
+data_long <- data_long[order(data_long$ID),] 
+```
+
+##Lavaan intro
+```{r Lavaan intro}
+#Linear model
+y ~ x1 + x2 + x3
+#Defining latent variables
+y =~ x1 + x2 + x3
+#Defining variances and covariances
+y ~~ x1
+#Intercept
+y ~ 1
+#Constraints
+y =~ NA*x1 + 1*x2 + a*x3 + a*x4
+```
+NA serves to free a lavaan imposed constraint. Here, the default is to set the first factor loading to 1 to define the latent variable. NA* serves to say there is no constraint.
+
+1* pre-multiples the loading by a particular number. In this case it is 1, to define the latent variable, but it could be any number. R doesn’t know if it makes sense or not.
+
+a* (or and other character strings) serves as an equality constraint by estimating the same parameter for each term with that label. In this case x3 and x4 will have the same factor loading, referred to as a.
+
+##How to run a model in lavaan
+```{r Running a lavaan model}
+HolzingerSwineford1939 <- HolzingerSwineford1939
+
+#1. Specify your model
+mod.1 <- 'visual =~ x1 + x2 + x3
+          textual =~ x4 + x5 + x6
+          speed =~ x7 + x8 + x9'
+
+#2. Fit the model
+fit <- cfa(mod.1, data=HolzingerSwineford1939)
+# other functions include sem, growth, and lavaan. All have different defaults (See below). we will use growth a lot. 
+
+#3. Display the summary output
+summary(fit, fit.measures=TRUE)
+
+#To set the relationship between visual and textual and visual and speed to be equal
+visual ~~ a*textual
+visual ~~ a*speed
+
+#Fixed factor approach rather than a marker variable approach
+fit.2 <- cfa(mod.2, std.lv=TRUE, data=HolzingerSwineford1939)
+
+summary(fit.2, fit.measures=TRUE, standardized=TRUE)
+
+#compare models
+anova(model1, model2)
+```
+Default is to fix first variable at 1.
+
+
+##Marilyn example
+```{r Marilyn example}
+#read.spss(, to.data.frame = TRUE)
+#NEED WIDE FORMAT
+
+
+
+```
+Intercept only model: Estimate for the intercept is the mean value of the DV.
+In MLM, there were 2 random effects (intercept and the residual). In SEM, we have the residuals of the items, but have them as time specific (item at time 1, time 2, time 3).
+We can actually test how similar the time points are.
+
