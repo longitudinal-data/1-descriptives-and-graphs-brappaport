@@ -46,7 +46,9 @@ data_wide <- data_wide %>%
 
 #Convert data to long form
 data_long <- data_wide %>% 
-  gather(c(-ID,-sex,-sex_01,-sex_c,-T1_ACES_sum,-ethin,-T1Income_to_Need,-T1Income_to_Need_c,-IQ), 
+  gather(c(-ID,-sex,-sex_01,-sex_c,-T1_ACES_sum,-ethin,-T1Income_to_Need,-T1Income_to_Need_c,-IQ, -mommdd, -mombipol
+           -momanxie, -momsuici, -momatten, -momsubab, -momschiz, -mompsnos, -momeatdi, -momcondu, -mommr, -mompsyun,
+           -rel_affective, -rel_MDD, -mom_MDDBP, -first_MDDBP, -rel_SUD), 
          key = "time", value = "value") %>% 
   separate(time, into = c("variable", "wave")) %>%
   spread(variable,value)
@@ -65,7 +67,7 @@ mod.1 <- 'peer =~ PPeerScale_1 + TPeerScale_1
           prosocial =~ PProScale_1 + TProScale_1'
 
 #2. Fit the model
-fit.1 <- cfa(mod.1, data=data_wide)
+fit.1 <- cfa(mod.1, data=data_wide, missing= "ML")
 # other functions include sem, growth, and lavaan. All have different defaults (See below). we will use growth a lot. 
 
 #3. Display the summary output
@@ -74,7 +76,7 @@ summary(fit.1, fit.measures=TRUE)
 
 ```{r Question 1 Fixed Factor}
 #Fixed factor approach
-fit.2 <- cfa(mod.1, std.lv=TRUE, data=data_wide)
+fit.2 <- cfa(mod.1, std.lv=TRUE, data=data_wide, missing= "ML")
 
 summary(fit.2, fit.measures=TRUE, standardized=TRUE)
 ```
@@ -90,20 +92,18 @@ mod.3 <- 'peer =~ NA*PPeerScale_1 + pe1*PPeerScale_1 + pe2*TPeerScale_1
      pr1 == 2 - pr2
 ' 
 
-fit.3 <- cfa(mod.3, data=data_wide) 
+fit.3 <- cfa(mod.3, data=data_wide, missing= "ML")
 summary(fit.3, fit.measures=TRUE, standardized=TRUE) 
-
-anova(fit.1,fit.3)
 ```
-Across the three models, the estimates of the latent variables (or the factor loadings) obviously change, but consistently indicate a larger factor loading teacher report onto the latent variable than parent report. The std.all does not change across models, since it is the standardized indicator of how much variance is being accounted for by the latent variable.
+Across the three models, the estimates of the latent variables (or the factor loadings) obviously change, but consistently indicate a larger factor loading teacher report onto the latent variable than parent report. This model indicates that the latent variables are accounting for a significant amount of variability in the indicators.
 
-In the fixed factor model, the covariance estimates indicate the correlation between the latent variables, here indicating that the Peer and Prosocial variables are highly correlated (0.884), while Peer and Aggression and Aggression and Prosocial are moderately related (0.633 and 0.546, repectively).
+In the fixed factor model, the covariance estimates indicate the correlation between the latent variables, here indicating that the Peer and Prosocial variables are highly correlated (0.897), while Peer and Aggression and Aggression and Prosocial are moderately related (0.685 and 0.575, repectively). The std.all is not introduced in the marker model, but does not change across the fixed factor and effects coding, since it is the standardized indicator of how much variance is being accounted for by the latent variable.
 
-The variance estimates for the latent variables also change. In the first model (marker variable approach), the estimates for the latent variables indicate that they are accounting for substantial variance in the scores. In the second model (fixed factor), the variance estimates are fixed to 1, and the variances of the residuals remains unchanged. In the third model (effects coding), the standarized estimates (std.all) are fixed to 1.
+The variance estimates for the latent variables also change. In the first (marker variable approach) and third model (effects coding), the estimates for the latent variables indicate that they are accounting for substantial variance in the scores. In the second model (fixed factor), the variance estimates are fixed to 1, and the variances of the residuals remains unchanged. In the third model (effects coding), the standarized estimates (std.all) are fixed to 1, but the raw estimates show significant variance accounted for.
 
 
 ## Question 2
-The RMSEA is above 0.1 (0.133), indicating a poor fit, however the SRMR is 0.056 indicating an acceptable fit. The CFI and TFI additionally fall below 0.90 at 0.879 and 0.698, respectively, suggesting a less than optimal fit. The model indicates 15 degrees of freedom indicating that is it overidentified (good).
+The RMSEA is above 0.1 (0.111), indicating a poor fit, however the SRMR is 0.050 indicating an acceptable fit. The CFI and TFI additionally fall below 0.90 (or 0.93) at 0.890 and 0.726, respectively, suggesting a less than optimal fit. The model indicates 15 degrees of freedom indicating that is it overidentified (good).
 
 
 ## Question 3
@@ -259,15 +259,19 @@ TProScale_10 ~~ TProScale_12 + TProScale_14
 TProScale_12 ~~ TProScale_14
 '
 
-#fit.4 <- cfa(mod.4, data=data_wide, missing="ML", std.lv=TRUE)
-#inspect(fit.4,"cov.lv")
+fit.4 <- cfa(mod.4, data=data_wide, missing="ML", std.lv=TRUE)
+inspect(fit.4,"cor.lv")
 
-#summary(fit.4, standardized=TRUE, fit.measures=TRUE)
+summary(fit.4, standardized=TRUE, fit.measures=TRUE)
+
+semPaths(fit.4, what="std")
 ```
-Received warning that covariance matrix was not positive definite.
+The first model (non-autoregressive) shows acceptable fit with the RMSEA and SRMR below 0.10 and the CFI above 0.9 (0.923 to be exact). There is a consistently larger factor loading of the teacher-report scores on the latent variables at each wave for the peer and prosocial scale (but not for the aggression scale where the loadings are equal).
+The most interesting thing to appear in the model is the significant correlations between the parent scores over time, but not the teacher scores. This is to be expected since the parents remain the same over this time, while the teachers change year to year.
+
 
 ```{r Question 3b}
-#Longitudinal cross-lagged model predicting later times by previous times (autoregressive)
+#Longitudinal path model predicting later times by previous times (autoregressive)
 mod.5.full <- '
 ##define latent variables
 peer1 =~ L1*PPeerScale_1 + L2*TPeerScale_1
@@ -322,51 +326,29 @@ pro6 ~~ NA*pro6
 pro7 ~~ NA*pro7
 pro8 ~~ NA*pro8
 
-peer1 ~~ agg1 + pro1
-agg1 ~~ pro1
-peer2 ~~ agg2 + pro2
-agg2 ~~ pro2
-peer3 ~~ agg3 + pro3
-agg3 ~~ pro3
-peer4 ~~ agg4 + pro4
-agg4 ~~ pro4
-peer5 ~~ agg5 + pro5
-agg5 ~~ pro5
-peer6 ~~ agg6 + pro6
-agg6 ~~ pro6
-peer7 ~~ agg7 + pro7
-agg7 ~~ pro7
-peer8 ~~ agg8 + pro8
-agg8 ~~ pro8
+peer2 ~~ peer1
+peer3 ~~ peer2
+peer4 ~~ peer3
+peer5 ~~ peer4
+peer6 ~~ peer5
+peer7 ~~ peer6
+peer8 ~~ peer7
 
-## directional regression paths
-peer2 ~ peer1 + agg1 + pro1
-agg2 ~ peer1 + agg1 + pro1
-pro2 ~ peer1 + agg1 + pro1
+agg2 ~~ agg1
+agg3 ~~ agg2
+agg4 ~~ agg3
+agg5 ~~ agg4
+agg6 ~~ agg5
+agg7 ~~ agg6
+agg8 ~~ agg7
 
-peer3 ~ peer2 + agg2 + pro2
-agg3 ~ peer2 + agg2 + pro2
-pro3 ~ peer2 + agg2 + pro2
-
-peer4 ~ peer3 + agg3 + pro3
-agg4 ~ peer3 + agg3 + pro3
-pro4 ~ peer3 + agg3 + pro3
-
-peer5 ~ peer4 + agg4 + pro4
-agg5 ~ peer4 + agg4 + pro4
-pro5 ~ peer4 + agg4 + pro4
-
-peer6 ~ peer5 + agg5 + pro5
-agg6 ~ peer5 + agg5 + pro5
-pro6 ~ peer5 + agg5 + pro5
-
-peer7 ~ peer6 + agg6 + pro6
-agg7 ~ peer6 + agg6 + pro6
-pro7 ~ peer6 + agg6 + pro6
-
-peer8 ~ peer7 + agg7 + pro7
-agg8 ~ peer7 + agg7 + pro7
-pro8 ~ peer7 + agg7 + pro7
+pro2 ~~ pro1
+pro3 ~~ pro2
+pro4 ~~ pro3
+pro5 ~~ pro4
+pro6 ~~ pro5
+pro7 ~~ pro6
+pro8 ~~ pro7
 
 ## correlated residuals across time
 PPeerScale_1 ~~ PPeerScale_3 + PPeerScale_5 + PPeerScale_10 + PPeerScale_12 + PPeerScale_14 +
@@ -472,39 +454,23 @@ pro4 ~~ NA*pro4
 pro5 ~~ NA*pro5
 pro6 ~~ NA*pro6
 
-peer1 ~~ agg1 + pro1
-agg1 ~~ pro1
-peer2 ~~ agg2 + pro2
-agg2 ~~ pro2
-peer3 ~~ agg3 + pro3
-agg3 ~~ pro3
-peer4 ~~ agg4 + pro4
-agg4 ~~ pro4
-peer5 ~~ agg5 + pro5
-agg5 ~~ pro5
-peer6 ~~ agg6 + pro6
-agg6 ~~ pro6
+peer2 ~~ peer1
+peer3 ~~ peer2
+peer4 ~~ peer3
+peer5 ~~ peer4
+peer6 ~~ peer5
 
-## directional regression paths
-peer2 ~ peer1 + agg1 + pro1
-agg2 ~ peer1 + agg1 + pro1
-pro2 ~ peer1 + agg1 + pro1
+agg2 ~~ agg1
+agg3 ~~ agg2
+agg4 ~~ agg3
+agg5 ~~ agg4
+agg6 ~~ agg5
 
-peer3 ~ peer2 + agg2 + pro2
-agg3 ~ peer2 + agg2 + pro2
-pro3 ~ peer2 + agg2 + pro2
-
-peer4 ~ peer3 + agg3 + pro3
-agg4 ~ peer3 + agg3 + pro3
-pro4 ~ peer3 + agg3 + pro3
-
-peer5 ~ peer4 + agg4 + pro4
-agg5 ~ peer4 + agg4 + pro4
-pro5 ~ peer4 + agg4 + pro4
-
-peer6 ~ peer5 + agg5 + pro5
-agg6 ~ peer5 + agg5 + pro5
-pro6 ~ peer5 + agg5 + pro5
+pro2 ~~ pro1
+pro3 ~~ pro2
+pro4 ~~ pro3
+pro5 ~~ pro4
+pro6 ~~ pro5
 
 ## correlated residuals across time
 PPeerScale_1 ~~ PPeerScale_3 + PPeerScale_5 + PPeerScale_10 + PPeerScale_12 + PPeerScale_14
@@ -544,10 +510,11 @@ TProScale_10 ~~ TProScale_12 + TProScale_14
 TProScale_12 ~~ TProScale_14
 '
 
-#fit.5 <- sem(mod.5, data=data_wide, missing = "FIML", std.lv=TRUE)
-#summary(fit.5, standardized=TRUE, fit.measures=TRUE)
+fit.5 <- sem(mod.5, data=data_wide, missing = "ML", std.lv=TRUE, control=list(iter.max=1000), verbose=FALSE)
+summary(fit.5, standardized=TRUE, fit.measures=TRUE)
 ```
-Converged (but again had to remove the last 2 time points)! It shows a poor fit, but only used 39/306 observations!! When I reran it using FIML for missing data, it ran into an error.
+Longitudinal path model did not converge after 1000 iterations!
+
 
 ```{r Question 4}
 #Longitudinal growth model with a fixed slope
@@ -561,7 +528,7 @@ fit.6.fixed <- growth(mod.6.fixed, missing = "ML", data = data_wide)
 inspect(fit.6.fixed, "cov.lv")
 #slope is 0.000
 
-#Longitudinal growth model with a random slope
+#Longitudinal growth model with a random slope an 6 month time metric (i.e. 1 unit = one 6 month period)
 mod.6.random <- ' i =~ 1*PPeerScale_1 + 1*PPeerScale_3 + 1*PPeerScale_5 +  1*PPeerScale_10 + 1*PPeerScale_12 + 
                         1*PPeerScale_14 + 1*PPeerScale_16 + 1*PPeerScale_18
                   s =~ 0*PPeerScale_1 + 2*PPeerScale_3 + 4*PPeerScale_5 +  9*PPeerScale_10 + 11*PPeerScale_12 + 
@@ -572,7 +539,7 @@ fit.6.random <- growth(mod.6.random, missing = "FIML", data = data_wide)
 #Calculate a more precise time metric
 apply(data_wide[,82:89], 2, mean, na.rm=T)
 
-#Longitudinal growth model with a random slope and more precise time metric
+#Longitudinal growth model with a random slope and more precise time metric (i.e. 1 unit = 1 year)
 mod.6.precise <- ' i =~ 1*PPeerScale_1 + 1*PPeerScale_3 + 1*PPeerScale_5 +  1*PPeerScale_10 + 1*PPeerScale_12 + 
                         1*PPeerScale_14 + 1*PPeerScale_16 + 1*PPeerScale_18
                   s =~ 0*PPeerScale_1 + 1.022622*PPeerScale_3 + 2.012532*PPeerScale_5 +  4.597019*PPeerScale_10 +
@@ -585,7 +552,7 @@ mod.6.MLM <- lmer(PPeerScale ~ age0 + (age0 | ID), data_long)
 summary(mod.6.MLM)
 summary(fit.6.precise)
 ```
-The mean estimate from the growth model (intercept= 61.337, and slope= 0.121) differs slightly from the fixed effects of the multilevel model (intercept= 61.1291, slope= 0.1551). The variance of the growth model (intercept= 49.535, slope= 0.826), also differs slightly from the random effect of the multilevel model (intercept= 43.36, slope= 0.8674).
+The mean estimate from the growth model (intercept= 61.337, and slope= 0.121) differs slightly from the fixed effects of the multilevel model (intercept= 61.165, slope= 0.144). The variance of the growth model (intercept= 49.535, slope= 0.826), also differs slightly from the random effect of the multilevel model (intercept= 49.80, slope= 0.867).
 
 
 ## Question 5
@@ -621,10 +588,9 @@ mod.6.fixed <- ' i =~ 1*PPeerScale_1 + 1*PPeerScale_3 + 1*PPeerScale_5 +  1*PPee
 
                  s ~~ 0*s #fixed slopes, no variance'
 fit.6.fixed <- growth(mod.6.fixed, missing = "ML", data = data_wide)
-inspect(fit.6.fixed, "cov.lv")
-#slope-slope covariance is 0.000
+summary(fit.6.fixed)
 ```
-Model won't run.
+The model now does not allow for variance around the slope (since it is fixed), but does not affect the estimates (i.e. fixed effects). Interestingly, the relationship between the intercept and slope switches signs, and is now negative, whereas before it was positive. 
 
 
 ## Question 7
@@ -632,14 +598,14 @@ Model won't run.
 #Longitudinal growth model with a random slope, with a different time metric
 mod.6.centered <- ' i =~ 1*PPeerScale_1 + 1*PPeerScale_3 + 1*PPeerScale_5 +  1*PPeerScale_10 + 1*PPeerScale_12 + 
                         1*PPeerScale_14 + 1*PPeerScale_16 + 1*PPeerScale_18
-                  s =~ -3*PPeerScale_1 + -2*PPeerScale_3 + -1*PPeerScale_5 +  0*PPeerScale_10 + 1*PPeerScale_12 + 
-                        2*PPeerScale_14 + 3*PPeerScale_16 + 4*PPeerScale_18'
+                  s =~ -8*PPeerScale_1 + -6*PPeerScale_3 + -4*PPeerScale_5 +  1*PPeerScale_10 + 3*PPeerScale_12 + 
+                        5*PPeerScale_14 + 7*PPeerScale_16 + 9*PPeerScale_18'
 fit.6.centered <- growth(mod.6.centered, missing = "FIML", data = data_wide)
 
 summary(fit.6.centered)
 summary(fit.6.random)
 ```
-The mean estimates of the intercept and slope changes slightly, since 0 now indicates the mean at the 4th wave rather than the 1st wave. The variance for the intercept and slope also changed slightly, as does the covariance between the intercept and slope. It does not seem to affect the fit statistics though.
+The mean estimates and variance of the intercept changes slightly, since 0 now indicates the mean between the 4th and 5th wave rather than the 1st wave. The covariance between the intercept and slope flips sign, however this is harder to intepret given that the intercept is now halfway through the trajectory and not at the beginning. It does not seem to affect the fit statistics though.
 
 
 ## Question 8
@@ -654,5 +620,51 @@ Changing the estimator to MLR seemed to only add to the fit statistics, adding a
 ```{r Question 9}
 semPaths(fit.1, what="std")
 semPaths(fit.3, what="std")
+semPaths(fit.6.precise, what="std")
 semPaths(fit.8.precise, what="std")
 ```
+
+
+##Extra: multivariate growth curves
+```{r Extra}
+#multiple MDDPRP by 100 to make it easier to analyze
+data_wide <- data_wide %>% 
+  mutate(MDDPRP_100_1 = MDDPRP_1*100,
+         MDDPRP_100_3 = MDDPRP_3*100,
+         MDDPRP_100_5 = MDDPRP_5*100,
+         MDDPRP_100_10 = MDDPRP_10*100,
+         MDDPRP_100_12 = MDDPRP_12*100,
+         MDDPRP_100_14 = MDDPRP_14*100,
+         MDDPRP_100_16 = MDDPRP_16*100,
+         MDDPRP_100_18 = MDDPRP_18*100)
+
+#Multivariate growth curve
+model.bi <- '
+    #create peer growth model
+                  i.p =~ 1*PPeerScale_1 + 1*PPeerScale_3 + 1*PPeerScale_5 +  1*PPeerScale_10 + 1*PPeerScale_12 + 
+                        1*PPeerScale_14 + 1*PPeerScale_16 + 1*PPeerScale_18
+                  s.p =~ 0*PPeerScale_1 + 1.022622*PPeerScale_3 + 2.012532*PPeerScale_5 +  4.597019*PPeerScale_10 +
+                        5.724867*PPeerScale_12 + 6.709552*PPeerScale_14 + 7.955476*PPeerScale_16 + 
+                        9.164656*PPeerScale_18
+    # create depression growth model 
+                  i.d =~ 1*MDDPRP_100_1 + 1*MDDPRP_100_3 + 1*MDDPRP_100_5 +  1*MDDPRP_100_10 + 1*MDDPRP_100_12 + 
+                        1*MDDPRP_100_14 + 1*MDDPRP_100_16 + 1*MDDPRP_100_18
+                  s.d =~ 0*MDDPRP_100_1 + 1.022622*MDDPRP_100_3 + 2.012532*MDDPRP_100_5 +  4.597019*MDDPRP_100_10 +
+                        5.724867*MDDPRP_100_12 + 6.709552*MDDPRP_100_14 + 7.955476*MDDPRP_100_16 + 
+                        9.164656*MDDPRP_100_18
+    # add time-invariant covariates
+              i.p ~ T1Income_to_Need_c + IQ + T1_ACES_sum + rel_affective + rel_MDD + mom_MDDBP
+              s.p ~ T1Income_to_Need_c + IQ + T1_ACES_sum + rel_affective + rel_MDD + mom_MDDBP
+              i.d ~ T1Income_to_Need_c + IQ + T1_ACES_sum + rel_affective + rel_MDD + mom_MDDBP
+              s.d ~ T1Income_to_Need_c + IQ + T1_ACES_sum + rel_affective + rel_MDD + mom_MDDBP
+
+'
+
+fit.bi <- growth(model.bi, data = data_wide, missing="FIML")
+summary(fit.bi)
+
+semPaths(fit.bi, what="std")
+```
+Higher intercept peer score (better relationships) is associated with a lower intercept of depression symptoms. In line with this, the slope of peer and depression are anti-correlated; that is, decreasing in peer is related to an increase in depressive symptoms. Finally, the intercept and slope of peer are anti-correlated, as is the intercept and slope of depressive symptoms.
+
+For the covariates, a higher initial peer score was associated with higher SES, but not higher IQ or fewer advserse events. Higher initial depressive symptoms predicted more adverse events and a greater likelihood of mother having an affective disorder (MDD or BP), however, SES was unrelated to initial depressive symptoms. 
