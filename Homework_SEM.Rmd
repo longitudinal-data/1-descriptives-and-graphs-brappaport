@@ -624,6 +624,254 @@ semPaths(fit.6.precise, what="std")
 semPaths(fit.8.precise, what="std")
 ```
 
+## Question 10
+```{r Question 10}
+#Baseline model
+config <- '## define latent variables
+Peer1 =~ L1*PPeerScale_1 + L2*TPeerScale_1
+Peer3 =~ L1*PPeerScale_3 + L2*TPeerScale_3
+Peer5 =~ L1*PPeerScale_5 + L2*TPeerScale_5
+Peer10 =~ L1*PPeerScale_10 + L2*TPeerScale_10
+Peer12 =~ L1*PPeerScale_12 + L2*TPeerScale_12
+Peer14 =~ L1*PPeerScale_14 + L2*TPeerScale_14
+
+## correlated residuals across time
+PPeerScale_1 ~~ PPeerScale_3 + PPeerScale_5 + PPeerScale_10 + PPeerScale_12 + PPeerScale_14
+PPeerScale_3 ~~ PPeerScale_5 + PPeerScale_10 + PPeerScale_12 + PPeerScale_14
+PPeerScale_5 ~~ PPeerScale_10 + PPeerScale_12 + PPeerScale_14
+PPeerScale_10 ~~ PPeerScale_12 + PPeerScale_14
+PPeerScale_12 ~~ PPeerScale_14
+
+TPeerScale_1 ~~ TPeerScale_3 + TPeerScale_5 + TPeerScale_10 + TPeerScale_12 + TPeerScale_14
+TPeerScale_3 ~~ TPeerScale_5 + TPeerScale_10 + TPeerScale_12 + TPeerScale_14
+TPeerScale_5 ~~ TPeerScale_10 + TPeerScale_12 + TPeerScale_14
+TPeerScale_10 ~~ TPeerScale_12 + TPeerScale_14
+TPeerScale_12 ~~ TPeerScale_14
+'
+
+config <- cfa(config, data=data_wide, meanstructure=TRUE, std.lv=TRUE, missing="ML")
+
+summary(config, standardized=TRUE, fit.measures=TRUE)
+
+#Testing for weak measurement invariance
+weak <- '
+## define latent variables
+Peer1 =~ L1*PPeerScale_1 + L2*TPeerScale_1
+Peer3 =~ L1*PPeerScale_3 + L2*TPeerScale_3
+Peer5 =~ L1*PPeerScale_5 + L2*TPeerScale_5
+Peer10 =~ L1*PPeerScale_10 + L2*TPeerScale_10
+Peer12 =~ L1*PPeerScale_12 + L2*TPeerScale_12
+Peer14 =~ L1*PPeerScale_14 + L2*TPeerScale_14
+
+## free latent variances at later times (only set the scale once)
+Peer3 ~~ NA*Peer3
+Peer5 ~~ NA*Peer5
+Peer10 ~~ NA*Peer10
+Peer12 ~~ NA*Peer12
+Peer14 ~~ NA*Peer14
+
+## correlated residuals across time
+PPeerScale_1 ~~ PPeerScale_3 + PPeerScale_5 + PPeerScale_10 + PPeerScale_12 + PPeerScale_14
+PPeerScale_3 ~~ PPeerScale_5 + PPeerScale_10 + PPeerScale_12 + PPeerScale_14
+PPeerScale_5 ~~ PPeerScale_10 + PPeerScale_12 + PPeerScale_14
+PPeerScale_10 ~~ PPeerScale_12 + PPeerScale_14
+PPeerScale_12 ~~ PPeerScale_14
+
+TPeerScale_1 ~~ TPeerScale_3 + TPeerScale_5 + TPeerScale_10 + TPeerScale_12 + TPeerScale_14
+TPeerScale_3 ~~ TPeerScale_5 + TPeerScale_10 + TPeerScale_12 + TPeerScale_14
+TPeerScale_5 ~~ TPeerScale_10 + TPeerScale_12 + TPeerScale_14
+TPeerScale_10 ~~ TPeerScale_12 + TPeerScale_14
+TPeerScale_12 ~~ TPeerScale_14
+
+'
+weak <- cfa(weak, data=data_wide, meanstructure=TRUE, std.lv=TRUE, missing="ML")
+summary(weak, standardized=TRUE, fit.measures=TRUE)
+
+
+#Testing for strong measurement invariance
+strong <- '
+## define latent variables
+Peer1 =~ L1*PPeerScale_1 + L2*TPeerScale_1
+Peer3 =~ L1*PPeerScale_3 + L2*TPeerScale_3
+Peer5 =~ L1*PPeerScale_5 + L2*TPeerScale_5
+Peer10 =~ L1*PPeerScale_10 + L2*TPeerScale_10
+Peer12 =~ L1*PPeerScale_12 + L2*TPeerScale_12
+Peer14 =~ L1*PPeerScale_14 + L2*TPeerScale_14
+
+## free latent variances at later times (only set the scale once)
+Peer3 ~~ NA*Peer3
+Peer5 ~~ NA*Peer5
+Peer10 ~~ NA*Peer10
+Peer12 ~~ NA*Peer12
+Peer14 ~~ NA*Peer14
+
+## correlated residuals across time
+PPeerScale_1 ~~ PPeerScale_3 + PPeerScale_5 + PPeerScale_10 + PPeerScale_12 + PPeerScale_14
+PPeerScale_3 ~~ PPeerScale_5 + PPeerScale_10 + PPeerScale_12 + PPeerScale_14
+PPeerScale_5 ~~ PPeerScale_10 + PPeerScale_12 + PPeerScale_14
+PPeerScale_10 ~~ PPeerScale_12 + PPeerScale_14
+PPeerScale_12 ~~ PPeerScale_14
+
+TPeerScale_1 ~~ TPeerScale_3 + TPeerScale_5 + TPeerScale_10 + TPeerScale_12 + TPeerScale_14
+TPeerScale_3 ~~ TPeerScale_5 + TPeerScale_10 + TPeerScale_12 + TPeerScale_14
+TPeerScale_5 ~~ TPeerScale_10 + TPeerScale_12 + TPeerScale_14
+TPeerScale_10 ~~ TPeerScale_12 + TPeerScale_14
+TPeerScale_12 ~~ TPeerScale_14
+
+
+## constrain intercepts across time
+PPeerScale_1 ~ t1*1
+TPeerScale_1 ~ t2*1
+
+PPeerScale_3 ~ t1*1
+TPeerScale_3 ~ t2*1
+
+PPeerScale_5 ~ t1*1
+TPeerScale_5 ~ t2*1
+
+PPeerScale_10 ~ t1*1
+TPeerScale_10 ~ t2*1
+
+PPeerScale_12 ~ t1*1
+TPeerScale_12 ~ t2*1
+
+PPeerScale_14 ~ t1*1
+TPeerScale_14 ~ t2*1
+
+## free latent means at later times (only set the scale once)
+Peer3 ~ NA*Peer3
+Peer5 ~ NA*Peer5
+Peer10 ~ NA*Peer10
+Peer12 ~ NA*Peer12
+Peer14 ~ NA*Peer14
+'
+
+strong <- cfa(strong, data=data_wide, meanstructure=TRUE, std.lv=TRUE, missing="ML")
+summary(strong, standardized=TRUE, fit.measures=TRUE)
+
+anova(config,weak)
+```
+Strong MI model did not converge. Config model fits significantly better than the weak model suggesting measurement invariance.
+
+##Question 11
+```{r Question 11}
+#Second order growth model: repeated measures are latent
+## define latent variables
+sec.order <- '
+Peer1 =~ NA*PPeerScale_1 + L1*PPeerScale_1 + L2*TPeerScale_1
+Peer3 =~ NA*PPeerScale_3 + L1*PPeerScale_3 + L2*TPeerScale_3
+Peer5 =~ NA*PPeerScale_5 + L1*PPeerScale_5 + L2*TPeerScale_5
+Peer10 =~ NA*PPeerScale_10 + L1*PPeerScale_10 + L2*TPeerScale_10
+Peer12 =~ NA*PPeerScale_12 + L1*PPeerScale_12 + L2*TPeerScale_12
+Peer14 =~ NA*PPeerScale_14 + L1*PPeerScale_14 + L2*TPeerScale_14
+Peer16 =~ NA*PPeerScale_16 + L1*PPeerScale_16 + L2*TPeerScale_16
+
+## constrain intercepts across time
+PPeerScale_1 ~ t1*1
+TPeerScale_1 ~ t2*1
+
+PPeerScale_3 ~ t1*1
+TPeerScale_3 ~ t2*1
+
+PPeerScale_5 ~ t1*1
+TPeerScale_5 ~ t2*1
+
+PPeerScale_10 ~ t1*1
+TPeerScale_10 ~ t2*1
+
+PPeerScale_12 ~ t1*1
+TPeerScale_12 ~ t2*1
+
+PPeerScale_14 ~ t1*1
+TPeerScale_14 ~ t2*1
+
+PPeerScale_16 ~ t1*1
+TPeerScale_16 ~ t2*1
+
+## correlated residuals across time
+
+## correlated residuals across time
+PPeerScale_1 ~~ PPeerScale_3 + PPeerScale_5 + PPeerScale_10 + PPeerScale_12 + PPeerScale_14 +
+PPeerScale_16
+PPeerScale_3 ~~ PPeerScale_5 + PPeerScale_10 + PPeerScale_12 + PPeerScale_14 +
+PPeerScale_16
+PPeerScale_5 ~~ PPeerScale_10 + PPeerScale_12 + PPeerScale_14 + PPeerScale_16
+PPeerScale_10 ~~ PPeerScale_12 + PPeerScale_14 + PPeerScale_16
+PPeerScale_12 ~~ PPeerScale_14 + PPeerScale_16
+PPeerScale_14 ~~ PPeerScale_16
+
+TPeerScale_1 ~~ TPeerScale_3 + TPeerScale_5 + TPeerScale_10 + TPeerScale_12 + TPeerScale_14 +
+TPeerScale_16
+TPeerScale_3 ~~ TPeerScale_5 + TPeerScale_10 + TPeerScale_12 + TPeerScale_14 +
+TPeerScale_16
+TPeerScale_5 ~~ TPeerScale_10 + TPeerScale_12 + TPeerScale_14 + TPeerScale_16
+TPeerScale_10 ~~ TPeerScale_12 + TPeerScale_14 + TPeerScale_16
+TPeerScale_12 ~~ TPeerScale_14 + TPeerScale_16
+TPeerScale_14 ~~ TPeerScale_16
+
+Peer1 ~ 0*1
+Peer3 ~ 0*1
+Peer5 ~ 0*1
+Peer10 ~ 0*1
+Peer12 ~ 0*1
+Peer14 ~ 0*1
+Peer16 ~ 0*1
+
+#model constraints for effect coding
+## loadings must average to 1
+L1 == 2- L2
+## means must average to 0
+t1 == 0 - t2
+
+#specify growth model
+i =~ 1*Peer1 + 1*Peer3 + 1*Peer5 + 1*Peer10 + 1*Peer12 + 1*Peer14 + 1*Peer16
+s =~ 0*Peer1 + 1.022622*Peer3 + 2.012532*Peer5 +  4.597019*Peer10 + 5.724867*Peer12 + 6.709552*Peer14 + 
+      7.955476*Peer16
+'
+
+fit.sec.order <- growth(sec.order, data=data_wide, missing = "ML")
+summary(fit.sec.order, fit.measures=TRUE)
+summary(fit.6.precise, fit.measures=TRUE)
+```
+
+##Question 12
+```{r Question 12}
+#Multiple groups model
+group1 <- 'Peer1 =~ PPeerScale_1 + TPeerScale_1
+Agg1 =~ PAggScale_1 + TAggScale_1
+
+Peer1 ~~ 1*Peer1
+Agg1 ~~ 1*Agg1
+
+Peer1 ~~ Agg1
+'
+
+fit.group.1 <- cfa(group1, data=data_wide, std.lv=TRUE, group = "sex_01", missing="ML")
+#summary(fit.group.1, standardized=TRUE, fit.measures=TRUE)
+
+
+group2 <- '
+## define latent variables
+Peer1 =~ c(L1,L1)*PPeerScale_1 + c(L2,L2)*TPeerScale_1
+Agg1 =~ PAggScale_1 + TAggScale_1
+
+Peer1 ~~ 1*Peer1
+Agg1 ~~ 1*Agg1
+
+Peer1 ~~ Agg1
+'
+
+fit.group.2 <- cfa(group2, data=data_wide, std.lv=TRUE, group = "sex_01", missing="ML")
+#summary(fit.group.2, standardized=TRUE, fit.measures=TRUE)
+
+#easier way to constrain parameters
+fit.group.3 <- cfa(group1, data=data_wide, std.lv=TRUE, group = "sex_01", group.equal = c("loadings", "intercepts"))
+summary(fit.group.3)
+
+anova(fit.group.1, fit.group.2)
+anova(fit.group.1, fit.group.3)
+```
+Constraining the parameters does not change the fit of the model.
 
 ##Extra: multivariate growth curves
 ```{r Extra}
@@ -640,7 +888,7 @@ data_wide <- data_wide %>%
 
 #Multivariate growth curve
 model.bi <- '
-    #create peer growth model
+    #create peer growth model for parent scores
                   i.p =~ 1*PPeerScale_1 + 1*PPeerScale_3 + 1*PPeerScale_5 +  1*PPeerScale_10 + 1*PPeerScale_12 + 
                         1*PPeerScale_14 + 1*PPeerScale_16 + 1*PPeerScale_18
                   s.p =~ 0*PPeerScale_1 + 1.022622*PPeerScale_3 + 2.012532*PPeerScale_5 +  4.597019*PPeerScale_10 +
@@ -653,10 +901,10 @@ model.bi <- '
                         5.724867*MDDPRP_100_12 + 6.709552*MDDPRP_100_14 + 7.955476*MDDPRP_100_16 + 
                         9.164656*MDDPRP_100_18
     # add time-invariant covariates
-              i.p ~ T1Income_to_Need_c + IQ + T1_ACES_sum + rel_affective + rel_MDD + mom_MDDBP
-              s.p ~ T1Income_to_Need_c + IQ + T1_ACES_sum + rel_affective + rel_MDD + mom_MDDBP
-              i.d ~ T1Income_to_Need_c + IQ + T1_ACES_sum + rel_affective + rel_MDD + mom_MDDBP
-              s.d ~ T1Income_to_Need_c + IQ + T1_ACES_sum + rel_affective + rel_MDD + mom_MDDBP
+              i.p ~ T1Income_to_Need_c + IQ + T1_ACES_sum + rel_affective + rel_MDD + mom_MDDBP + ethin
+              s.p ~ T1Income_to_Need_c + IQ + T1_ACES_sum + rel_affective + rel_MDD + mom_MDDBP + ethin
+              i.d ~ T1Income_to_Need_c + IQ + T1_ACES_sum + rel_affective + rel_MDD + mom_MDDBP + ethin
+              s.d ~ T1Income_to_Need_c + IQ + T1_ACES_sum + rel_affective + rel_MDD + mom_MDDBP + ethin
 
 '
 
