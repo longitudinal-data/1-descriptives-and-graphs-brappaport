@@ -7,7 +7,7 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = T, eval = T, cache = T, warning = F, message = T)
-rm(list=ls())
+#rm(list=ls())
 library(psych)
 library(tidyverse)
 library(sjPlot)
