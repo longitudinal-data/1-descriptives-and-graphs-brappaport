@@ -1,0 +1,402 @@
+---
+title: "Growth Mixture Models ALDA Presentation"
+author: "Brent Rappaport"
+date: "November 28, 2017"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+    code_folding: "hide"
+#runtime: shiny
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo= TRUE, warning= FALSE, cache= TRUE)
+library(ggplot2)
+library(psych)
+library(knitr)
+library(Rmisc)
+library(tidyverse)
+library(car)
+library(lsr)
+library(lsmeans)
+library(R.utils)
+library(descr)
+library(mice)
+library(lme4)
+library(mnlogit)
+library(foreign)
+library(broom)
+library(parallel)
+library(lmerTest)
+
+library(ggthemes) ##to help make graphs
+library(ggrepel) ##to help make graphs
+library(nnet) ##need this to do multinomial logistic regression
+library(lcmm) ##this is the main package we will use for the GMM analyses
+
+data_wide <- read.csv("/Users/BrentRappaport/Box Sync/WashU/Classes/Longtudinal Methods/1-descriptives-and-graphs-brappaport/Rappaport_data.csv")
+data_wide <- data_wide[,-1]
+
+#Convert data to long form
+data_long <- data_wide %>% 
+  gather(c(-ID,-sex,-sex_01,-sex_c,-T1_ACES_sum,-ethin,-T1Income_to_Need,-T1Income_to_Need_c,-IQ, -mommdd, -mombipol,
+           -momanxie, -momsuici, -momatten, -momsubab, -momschiz, -mompsnos, -momeatdi, -momcondu, -mommr, -mompsyun,
+           -rel_affective, -rel_MDD, -mom_MDDBP, -first_MDDBP, -rel_SUD), 
+         key = "time", value = "value") %>% 
+  separate(time, into = c("variable", "wave")) %>%
+  spread(variable,value)
+
+data_long$wave <- as.integer(data_long$wave)
+
+
+##Can square the wave variable to assess quadratic group trajectories
+data_long$wave2 <- data_long$wave^2
+data_long$age2 <- data_long$age^2
+
+#sort by id, VERY IMPORTANT!!! lcmm won't run correctly unless the data is sorted by subject ID
+data_long <- data_long[order(data_long$ID),]
+```
+
+## After converting data to long format, make sure you SORT BY SUBJECT ID
+```{r Sort by subject ID}
+# sort by id, VERY IMPORTANT!!! lcmm won't run correctly unless the data is sorted by subject ID
+# I just put this as the first link in the chunks to make sure that it is always the case before running the models.
+data_long <- data_long[order(data_long$ID),]
+```
+
+## Run GMM by wave
+### Here I am looking at the peer relationships composite score over time, using a discrete indicator of wave
+```{r 1 class model using discrete time variable (wave)}
+data_long <- data_long[order(data_long$ID),]
+
+# First, we need to run the GMM with only 1 class (ng=1)
+# Run model using Wave as my time variable (and Wave^2 to account for quadratic trajectory) and PPeerScale as my dependent variable
+wave_model1 <- lcmm(fixed=PPeerScale~wave+wave2, 
+                   random=~wave, nwg=FALSE, subject='ID',
+                   ng=1,idiag=FALSE,link="linear",data=data_long)
+```
+Wow neat! It tells me how long it took to run. This will come in handy later when it starts taking 30+ seconds to run the model each time.
+
+####Lcmm legend: what do each of the arguments mean?
+fixed: specify fixed-effects
+random argument: specify random effects
+mixture argument: specify which variables or covariates should be used to predict class membership
+nwg: FALSE = fix the variance-covariance matrix to be the same across classes
+     TRUE = variance-covariance matrix is free to vary between classes
+subject: what is the variable that distinguishes between subjects
+ng: number of classes
+idiag: FALSE = use a non-structured variance-covariance matrix
+       TRUE = use a diagonal variance-covariance matrix
+link: family of link functions, different options depending on the distribution of your data (e.g., linear for normal distribution, beta for a beta distribution), also has an options for splines to fit your data using data-driven quantiles (which I do below)
+data: data file
+B: specify starting values
+```{r Multi-class models using discrete time variable (wave)}
+data_long <- data_long[order(data_long$ID),]
+
+# A quick note about running these models: they can take quite a while to run. Each repition 
+# can take anywhere from 2 seconds to 200 seconds (or longer depending), so keep that in mind 
+# and don't use functions at the beginning of your script that will clear the environment 
+# of you'll have to keep rerunning the models. If you are really worried about losing them, 
+# you can save them to their own .Rdata file
+save(wave_model1,wave_model2,wave_model3,wave_model4,wave_model5,age_model1,age_model2,age_model3,age_model4,cov_model1,cov_model2,cov_model3,cov_model4,file="ALDA_presentation_models.RData")
+
+for (i in 2:5) { #set the number of classes to try, here I specify 2 through 5 classes, 
+  #since I already ran the 1 class model above
+  temp_wave <- gridsearch(rep=25, maxiter=100, minit=wave_model1,
+                    lcmm(PPeerScale~wave+wave2, 
+                   mixture=~wave,random=~wave, nwg=TRUE,
+                   subject='ID',ng=i,idiag=FALSE,link="linear",
+                   data=data_long,B=random(minit)))
+  
+  label_wave <- paste("wave_model",i,sep="") #save each model as "wave_modeli" 
+  #where i is the number of classes (so the 3 class model will be called 'wave_model3')
+  assign(label_wave,temp_wave)
+  save.image()
+}
+
+# Which model is best? Summary table gives you information useful for choosing classes
+summarytable(wave_model1,wave_model2,wave_model3,wave_model4,wave_model5)
+```
+The 4 class model has the smallest BIC, but one of the classes is pretty small (5.6% or 17 subjects), so I might want to keep that in mind when choosing the appropriate number of classes.
+
+###Gridsearch: Also, I used a function called gridsearch. Gridsearch is a function that generates random start values from the 1 class model, to avoid convergence towards a local maximum. You nest the lcmm function within the gridsearch function.
+####Gridsearch legend
+Rep: number of sets of different starting values to try, i.e. the number of times to run the model (here I'ved used 25 but 50 would work too if you want to be sure and have time to kill)
+Maxiter: Number of iterations everytime you run the model
+Minit: The 1 class model
+
+##Other measures of model fit
+What are some other ways we can tell how well the model fits the data, or in this case, how well the individual trajectories are classified into groups? To measure this we can use:
+Posterior probabilites: probability of a subject belonging to each class
+Entropy: how well one can predict class membership based an individual’s trajectory and covariate values (1.0 is perfect, 0 is poor)
+
+Since LCMM doesn't have an entropy function, I used one written by the authors of OpenMX (another SEM package/software).
+```{r Measuring how well trajectories fit into their class}
+# How many subjects are in each class?
+ppwave_model4 <- postprob(wave_model4,c(0.7,0.8,0.9)) #for the model with 4 classes
+ppwave_model4[1]
+
+# What are the mean posterior probabilities for each class? And what percent 
+# of subjects in each class have posterior probabilities above thresholds (specified in the function)?
+ppwave_model4[2:3]
+
+#Entropy
+# LCMM doesn't have a function (that I know of), to calculate relative entropy, 
+# so I used this homemade function supplied by OpenMX
+# Calculate relative entropy based on post from OpenMx 
+# (see http://openmx.ssri.psu.edu/thread/717)
+
+entropy <- function(classProbs){
+    n <- dim(classProbs)[1]
+    k <- dim(classProbs)[2]
+    e <- 1-sum(-classProbs*log(classProbs))/(n*log(k))
+    return(e)
+}
+
+entropy(classProbs = wave_model2$pprob[,3:4])
+entropy(classProbs = wave_model3$pprob[,3:5])
+entropy(classProbs = wave_model4$pprob[,3:6])
+```
+Oof neither of these look great. Typically, entropy should be above 0.80 to suggest that the trajectories actually belong to different, distinct classes. Otherwise, you could argue that individuals are different enough within classes that they should be examined individually. However, the GRoLTS checklist emphasizes NOT using entropy to choose an appropriate number of classes (i.e. choosing the model with the highest entropy is not recommended).
+
+
+##Graphing these
+###Quick and easy method!
+The package 'lcmm' uses the plot function (or you can use the plot.lcmm function). Can choose what to plot by the "which" argument. Can plot: residuals, posterior probabilities, fit (or the actual class trajectories), link function, and others for other types of GMMs.
+```{r LCMM default easy plots}
+plot.lcmm
+plot(wave_model1,which="fit",var.time="wave",bty="n")
+plot(wave_model2,which="fit",var.time="wave",bty="n")
+#hide the legend, making it easier to see the trajectories
+plot(wave_model3,which="fit",var.time="wave",bty="n")
+plot(wave_model4,which="fit",var.time="wave",bty="n")
+```
+This is nice to glance at the class trajectories, but I don't know what the y-axis units are, so this is certainly not something you'd want to put in a presentation (not like I've ever done that...), so let's try using ggplot.
+
+```{r ggplot tough graphs}
+#First, we need a data frame that specifies which class subjects are in
+membership <- as.data.frame(matrix(nrow=302,ncol=4))
+colnames(membership) <- c("ID","Class_2","Class_3","Class_4")
+membership[,1:2] <- wave_model2$pprob[,1:2]
+membership[,3:4] <- c(wave_model3$pprob[,2],wave_model4$pprob[,2])
+
+
+#Recode into classes with meaningful names
+#NOTE: Class 1 in the 2 class model will not necessary be the "same" 
+# (i.e. have the same trajectory) as Class 1 and 2 in the 3 class model.
+# Take a look back at the plots above to see an example of this disparity.
+membership$Class_2 <- as.character(membership$Class_2)
+membership$Class_2 <- revalue(membership$Class_2, c("1"="Stable_High","2"="Stable_Low"))
+membership$Class_3 <- as.character(membership$Class_3)
+membership$Class_3 <- revalue(membership$Class_3, c("1"="Stable_Middle","2"="Stable_High","3"="Stable_Low"))
+membership$Class_4 <- as.character(membership$Class_4)
+membership$Class_4 <- revalue(membership$Class_4, c("1"="Stable_Middle","2"="Stable_Low"
+                                                        ,"3"="Stable_High","4"="Stable_VeryLow"))
+
+
+#Now to plot them
+#Let's merge this back with our long dataset
+data_long2 <- merge(membership,data_long)
+
+#2 class model
+ggplot(data_long2[data_long2$Class_2 %in% c("Stable_High","Stable_Low"), ],
+       aes(wave,PPeerScale,group=ID,color=Class_2)) + 
+  geom_line(alpha=0.25) + 
+  geom_smooth(aes(group=Class_2),method="loess",size=1.5,se=T,linetype="longdash")  + 
+  labs(x="Age",y="Parent Report Score of Peer Relationships",colour="Latent Class") + 
+  ggtitle("Individual Subject Trajectories for Parent Report on
+  Peer Relationships with 2 class model")
+
+#3 class model
+ggplot(data_long2[data_long2$Class_3 %in% c("Stable_High","Stable_Low","Stable_Middle"), ],
+       aes(wave,PPeerScale,group=ID,color=Class_3)) + 
+  geom_line(alpha=0.25) + 
+  geom_smooth(aes(group=Class_3),method="loess",size=1.5,se=T,linetype="longdash")  + 
+  labs(x="Age",y="Parent Report Score of Peer Relationships",colour="Latent Class") + 
+  ggtitle("Individual Subject Trajectories for Parent Report on
+  Peer Relationships with 3 class model")
+
+#4 class model
+ggplot(data_long2[data_long2$Class_4 %in% c("Stable_High","Stable_Low","Stable_Middle","Stable_VeryLow"), ],
+       aes(wave,PPeerScale,group=ID,color=Class_4)) + 
+  geom_line(alpha=0.25) + 
+  geom_smooth(aes(group=Class_4),method="loess",size=1.5,se=T,linetype="longdash")  + 
+  labs(x="Age",y="Parent Report Score of Peer Relationships",colour="Latent Class") + 
+  ggtitle("Individual Subject Trajectories for Parent Report on
+  Peer Relationships with 4 class model")
+```
+If you think these are meaningful classes, you can then compare them on predictors and outcomes using logistic multinomial and multiple regression, respectively. This paper (Group-Based Trajectory Modeling in Clinical Research: ncbi.nlm.nih.gov/pubmed/20192788) is a good example of how to do this.
+
+One simple way is using a logistic regression to test what variables predict class membership.
+```{r Logistic regression to predict class membership}
+#First, I need to merge the class memberships with the WIDE data
+data_wide2 <- merge(membership,data_wide)
+
+#Run the logistic regression
+MLR_3classes <- multinom(Class_3 ~ MDDCORE_1+sex_01+T1Income_to_Need_c+T1_ACES_sum+IQ,data=data_wide2);
+                          summary(MLR_3classes)
+#estimate column is Odds, not b coefficient
+MLR_3classes_plot <- tidy(MLR_3classes, conf.int = TRUE)
+
+#This is one way I like to graph regression results.
+# The x axis is the z statistic, the y axis is the categorical predictor,
+# and the points are labeled with their Odds ratio.
+ggplot(MLR_3classes_plot, aes(statistic, term, color = y.level)) +
+    scale_colour_tableau() +
+    geom_point() +
+    geom_vline(xintercept=-1.96) +
+    geom_vline(xintercept=1.96) +
+    geom_text(aes(label=round(estimate,digits=2)),hjust=.5, vjust=1.5) +
+    annotate("text", x = 3.2, y = .8, size = 6, label = "label: Odds") +
+    labs(title="Baseline symptoms predicting class membership",
+         x="z Statistic",y="Predictor",color="Class") +
+    scale_y_discrete(limits=c("sex_01","T1Income_to_Need_c","T1_ACES_sum","IQ","MDDCORE_1"),
+                   breaks=c("sex_01","T1Income_to_Need_c","T1_ACES_sum","IQ","MDDCORE_1"),
+                   labels=c("Sex","SES","Adverse Childhood\nExperiences","Intelligence Quotient","MDD\nsymptoms"))
+#use facets in ggplot to separate Classes for eaach predictor
+#and plot Odds on X axis with CI around them (if they don't include 0, then they are significant)
+```
+So we see that early MDD symptoms at wave 1 are predicting membership in the two classes with lower trajectories of peer relationships. The Stable_High class is not shown since it is used as the reference class in the logistic regression.
+
+We can do something similar for multiple regression of class predicting outcomes.
+```{r Multiple regression to predict depression symptoms from class membership}
+#First, I need to merge the class memberships with the WIDE data
+data_wide2 <- merge(membership,data_wide)
+
+#Run the multiple regression
+MR_3classes <- lm(MDDCORE_10 ~ Class_3+MDDCORE_1+sex_01+T1Income_to_Need_c+T1_ACES_sum+IQ,data=data_wide2);
+                          summary(MR_3classes)
+#estimate column b coefficient
+MR_3classes_plot <- tidy(MR_3classes, conf.int = TRUE)
+
+#This is one way I like to graph regression results
+# The x axis is the z statistic, the y axis is the categorical predictor,
+# and the points are labeled with their b coefficients.
+
+ggplot(MR_3classes_plot,aes(statistic, term)) +
+    scale_colour_tableau() +
+    geom_point() +
+    geom_vline(xintercept=-1.96) +
+    geom_vline(xintercept=1.96) +
+    geom_text_repel(data=MR_3classes_plot, aes(label=round(estimate,digits=2))) +
+    annotate("text", size=5, x = 4, y = .8, label = "label: b") +
+    labs(title="Peer class membership predicting T10 symptoms",
+         x="t Statistic",y="Predictor",color="Class") +
+    scale_y_discrete(limits=c("sex_01","T1Income_to_Need_c","T1_ACES_sum",
+                              "IQ","MDDCORE_1",
+                              "Class_3Stable_Low","Class_3Stable_Middle"),
+                   breaks=c("sex_01","T1Income_to_Need_c","T1_ACES_sum",
+                              "IQ","MDDCORE_1",
+                              "Class_3Stable_Low","Class_3Stable_Middle"),
+                   labels=c("Sex","SES (centered)","Adverse Childhood\nExperiences",
+                            "Intelligence Quotient","Initial MDD\nsymptoms",
+                            "Stable Low Class","Stable Middle Class"))
+```
+So we see that the stable low class is at a much higher odds of having depressive symptoms, even when accounting for initial depressive symptoms at time 1.
+
+Wait, but are my measures normally distributed?
+
+## Check and see how my data are distributed
+```{r Histograms}
+#Plot histogram for time point 1
+ggplot(data_wide2, aes(x=PPeerScale_1)) +
+  geom_histogram(aes(y=..density..), binwidth=.5, colour="black", fill="white", na.rm=T) +
+  ylab("Density") +
+  stat_function(fun = dnorm, args = list(mean = 
+            mean(data_wide2$PPeerScale_1, na.rm=T), 
+            sd = sd(data_wide2$PPeerScale_1, na.rm=T)), 
+            size = .5, color = "black") +
+  ggtitle("Peer Parent Score")
+
+#Plot histogram for time point 10 (4th wave)
+ggplot(data_wide2, aes(x=PPeerScale_10)) +
+  geom_histogram(aes(y=..density..), binwidth=.5, colour="black", fill="white", na.rm=T) +
+  ylab("Density") +
+  stat_function(fun = dnorm, args = list(mean = 
+            mean(data_wide2$PPeerScale_10, na.rm=T), 
+            sd = sd(data_wide2$PPeerScale_10, na.rm=T)), 
+            size = .5, color = "black") +
+  ggtitle("Peer Parent Score")
+
+#Plot histogram for time point (8th wave)
+ggplot(data_wide2, aes(x=PPeerScale_18)) +
+  geom_histogram(aes(y=..density..), binwidth=.5, colour="black", fill="white", na.rm=T) +
+  ylab("Density") +
+  stat_function(fun = dnorm, args = list(mean = 
+            mean(data_wide2$PPeerScale_18, na.rm=T), 
+            sd = sd(data_wide2$PPeerScale_18, na.rm=T)), 
+            size = .5, color = "black") +
+  ggtitle("Peer Parent Score")
+```
+This is really non-normal, and this pattern holds throughout all the waves (because most youth thankfully have good peer relationships). This may be problematic. Using the **spline** family of link functions in LCMM, we can try to fix this.
+
+LCMM also lets you use a continuous time variable like Age in place of a discrete one like Wave. Below, I've changed the code to run a spline model using Age and Age^2 as the time variables.
+```{r Spline function}
+data_long <- data_long[order(data_long$ID),]
+
+#Here is the model with only 1 class and 14 splines
+age_model1 <- lcmm(fixed=PPeerScale~age+age2, 
+                   random=~age, nwg=FALSE, subject='ID',
+                   ng=1,idiag=FALSE,link="14-quant-splines",data=data_long)
+
+for (i in 2:4) { #set the number of classes to try, here I specify 2 through 4 classes, since I already ran the 1 class model above
+  temp_age <- gridsearch(rep=25, maxiter=100, minit=age_model1,
+                    lcmm(PPeerScale~age+age2, 
+                   mixture=~age,random=~age, nwg=TRUE,
+                   subject='ID',ng=i,idiag=FALSE,link="14-quant-splines",
+                   data=data_long,B=random(minit)))
+  
+  label_age <- paste("age_model",i,sep="") #save each model as "age_modeli" where i is the number of classes (so the 3 class model will be called 'age_model3')
+  assign(label_age,temp_age)
+  save.image() #save the workspace after each run in case of an error
+}
+
+summarytable(age_model1,age_model2,age_model3,age_model4)
+
+data_long <- data_long[order(data_long$ID),]
+plot(age_model1,which="fit",var.time="age",bty="n")
+plot(age_model2,which="fit",var.time="age",bty="n",legend=NULL) #hide the legend
+plot(age_model3,which="fit",var.time="age",bty="n")
+plot(age_model4,which="fit",var.time="age",bty="n")
+
+# To get a sense of how the link function changed, LCMM lets us plot it
+plot(age_model1,which="link",var.time="age",bty="n") #using link="spline"
+plot(wave_model1,which="link",var.time="age",bty="n") #using link="linear"
+```
+Now it looks like the 3 class model has the lowest BIC, but also has a class with only 5 subjects in it (1.656%), so I'd probably want to stick with the 2 class model.
+
+LCMM also has a multlcmm option for running a multivariate GMM (multlcmm). Multlcmm is very similar to lcmm except that 
+The package also includes the function hlme which does all the same things as the lcmm function but assumes normality and therefore doesn't ask you to specify the link function.
+
+Finally, you can add covariates into the model to have those predict class membership (using classmb=)
+```{r With a covariate}
+data_long <- data_long[order(data_long$ID),]
+
+#Here is the model with only 1 class and 14 splines, and a covariate of depressive symptoms
+cov_model1 <- lcmm(fixed=PPeerScale~age+age2, 
+                   random=~age, nwg=FALSE, subject='ID',
+                   ng=1,idiag=FALSE,link="14-quant-splines",data=data_long)
+
+for (i in 2:3) { #set the number of classes to try
+  temp_cov <- gridsearch(rep=25, maxiter=100, minit=cov_model1,
+                    lcmm(PPeerScale~age+age2, 
+                   mixture=~age,random=~age,classmb=~MDDCORE, nwg=TRUE,
+                   subject='ID',ng=i,idiag=FALSE,link="14-quant-splines",
+                   data=data_long,B=random(minit)))
+  
+  label_cov <- paste("cov_model",i,sep="") #save each model as "age_modeli" where i is the number of classes (so the 3 class model will be called 'age_model3')
+  assign(label_cov,temp_cov)
+  save.image() #save the workspace after each run in case of an error
+}
+
+summarytable(cov_model1,cov_model2,cov_model3)
+
+data_long <- data_long[order(data_long$ID),]
+plot(cov_model1,which="fit",var.time="age",bty="n")
+plot(cov_model2,which="fit",var.time="age",bty="n",legend=NULL) #hide the legend
+plot(cov_model3,which="fit",var.time="age",bty="n")
+```
+Now the 2 class model is the best fit and neither class is inordinately small.
+
+Paper detailing how these can be used for clinical research (Nagin & Odgers, 2010): https://www.ncbi.nlm.nih.gov/pubmed/20192788
