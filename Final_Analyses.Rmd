@@ -1,0 +1,407 @@
+---
+title: "Final_Analyses"
+author: "Brent Rappaport"
+date: "12/6/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo= TRUE, warning= FALSE, cache= TRUE)
+library(ggplot2)
+library(psych)
+library(knitr)
+library(Rmisc)
+library(tidyverse)
+library(car)
+library(lsr)
+library(lsmeans)
+library(R.utils)
+library(descr)
+library(lme4)
+library(nnet)
+library(mnlogit)
+library(foreign)
+library(broom)
+library(parallel)
+library(lmerTest)
+library(semPlot)
+library(lavaan) ##need this to run the analyses
+library(ggthemes) ##to help make graphs
+library(ggrepel) ##to help make graphs
+
+
+data_wide <- read.csv("/Users/BrentRappaport/Box Sync/WashU/Classes/Longtudinal Methods/1-descriptives-and-graphs-brappaport/Rappaport_data.csv")
+data_wide <- data_wide[,-1]
+
+#Convert data to long form
+data_long <- data_wide %>% 
+  gather(c(-ID,-sex,-sex_01,-sex_c,-T1_ACES_sum,-ethin,-T1Income_to_Need,-T1Income_to_Need_c,-IQ, -mommdd, -mombipol,
+           -momanxie, -momsuici, -momatten, -momsubab, -momschiz, -mompsnos, -momeatdi, -momcondu, -mommr, -mompsyun,
+           -rel_affective, -rel_MDD, -mom_MDDBP, -first_MDDBP, -rel_SUD), 
+         key = "time", value = "value") %>% 
+  separate(time, into = c("variable", "wave")) %>%
+  spread(variable,value)
+
+data_long$wave <- as.integer(data_long$wave)
+
+##Square the time variables
+data_long$wave2 <- data_long$wave^2
+data_long$age2 <- data_long$age^2
+
+data_long <- data_long[order(data_long$ID),]
+
+data_wide <- data_wide %>%
+  mutate(MDDPRP100_1 = MDDPRP_1*100,
+         MDDPRP100_3 = MDDPRP_3*100,
+         MDDPRP100_5 = MDDPRP_5*100,
+         MDDPRP100_10 = MDDPRP_10*100,
+         MDDPRP100_12 = MDDPRP_12*100,
+         MDDPRP100_14 = MDDPRP_14*100,
+         MDDPRP100_16 = MDDPRP_16*100,
+         MDDPRP100_18 = MDDPRP_18*100)
+```
+
+Descriptive statistics
+```{r Descriptive statistics}
+#Descriptive stats of the same variables over time
+descr(data_wide[,c("PPeerScale_1","PPeerScale_3","PPeerScale_5","PPeerScale_10","PPeerScale_12",
+                       "PPeerScale_14","PPeerScale_16","PPeerScale_18")])
+
+descr(data_wide[,c("TPeerScale_1","TPeerScale_3","TPeerScale_5","TPeerScale_10","TPeerScale_12",
+                       "TPeerScale_14","TPeerScale_16","TPeerScale_18")])
+
+descr(data_wide[,c("MDDCORE_1","MDDCORE_3","MDDCORE_5","MDDCORE_10","MDDCORE_12",
+                       "MDDCORE_14","MDDCORE_16","MDDCORE_18")])
+
+descr(data_wide[,c("MDDPRP_1","MDDPRP_3","MDDPRP_5","MDDPRP_10","MDDPRP_12",
+                       "MDDPRP_14","MDDPRP_16","MDDPRP_18")])
+
+#Relationship betweem MDDCORE and MDDPRP
+cor(data_wide[,c("MDDCORE_1","MDDCORE_3","MDDCORE_5","MDDCORE_10","MDDCORE_12",
+                 "MDDCORE_14","MDDCORE_16","MDDCORE_18")],
+    data_wide[,c("MDDPRP_1","MDDPRP_3","MDDPRP_5","MDDPRP_10","MDDPRP_12",
+                 "MDDPRP_14","MDDPRP_16","MDDPRP_18")],method= "pearson", use="complete.obs")
+
+#Relationship of Parent and Teacher report on the Peer scale over time
+cor(data_wide[,c("PPeerScale_1","PPeerScale_3","PPeerScale_5","PPeerScale_10","PPeerScale_12",
+                 "PPeerScale_14","PPeerScale_16","PPeerScale_18")],
+    data_wide[,c("TPeerScale_1","TPeerScale_3","TPeerScale_5","TPeerScale_10","TPeerScale_12",
+                 "TPeerScale_14","TPeerScale_16","TPeerScale_18")],method="pearson", use="na.or.complete")
+```
+
+Individual Trajectories
+```{r Individual trajectories}
+ggplot(data_long,aes(age,PPeerScale,group=ID)) +
+  geom_line(alpha=.5) +
+  stat_smooth(aes(group=1),method="lm",size=1,se=T,linetype="longdash") + 
+  labs(x="Age",y="Parent-report Peer Scale Score") +
+  theme(text=element_text(lineheight=1, face="bold", size=15), 
+        legend.position="none")
+
+ggplot(data_long,aes(age,PPeerScale,group=ID,color=factor(sex))) +
+  geom_line(alpha=.5) +
+  scale_color_manual(values=c("#377EB8","#E41A1C"),
+                     name ="Sex", breaks=c(1,2),
+                         labels=c("Male","Female")) +
+  stat_smooth(aes(group=factor(sex)),method="lm",size=1,se=T,linetype="longdash",
+              formula=y~x+I(x^2),size=1) +
+  labs(x="Age",y="Parent-report Peer Scale Score") +
+  theme(text=element_text(lineheight=1, face="bold", size=15), 
+        legend.position="right")
+
+ggplot(data_long,aes(age,MDDCORE,group=ID)) +
+  geom_line(alpha=.5) +
+  stat_smooth(aes(group=1),method="lm",size=1,se=T,linetype="longdash") + 
+  labs(x="Age",y="MDD Core Symptoms") +
+  theme(text=element_text(lineheight=1, face="bold", size=15), 
+        legend.position="none")
+
+ggplot(data_long,aes(age,MDDPRP,group=ID)) +
+  geom_line(alpha=.5) +
+  stat_smooth(aes(group=1),method="lm",size=1,se=T,linetype="longdash") + 
+  labs(x="Age",y="Proportion of MDD Symptoms") +
+  theme(text=element_text(lineheight=1, face="bold", size=15), 
+        legend.position="none")
+```
+
+Bivariate multiwave latent change model for Peer score
+```{r Bivariate multiwave latent change model for Peer score}
+Peer_BMWLC <- '
+#Defining the latent variables
+Peer_1=~1*PPeerScale_1+1*TPeerScale_1        # Defining the Peer latent variables
+Peer_2=~1*PPeerScale_3+1*TPeerScale_3        # Defining the Peer latent variables
+Peer_3=~1*PPeerScale_5+1*TPeerScale_5        # Defining the Peer latent variables
+Peer_4=~1*PPeerScale_10+1*TPeerScale_10        # Defining the Peer latent variables
+Peer_5=~1*PPeerScale_12+1*TPeerScale_12        # Defining the Peer latent variables
+Peer_6=~1*PPeerScale_14+1*TPeerScale_14        # Defining the Peer latent variables
+
+MDD_1=~1*MDDCORE_1        # Defining the MDD latent variables
+MDD_2=~1*MDDCORE_3        # Defining the MDD latent variables
+MDD_3=~1*MDDCORE_5        # Defining the MDD latent variables
+MDD_4=~1*MDDCORE_10        # Defining the MDD latent variables
+MDD_5=~1*MDDCORE_12        # Defining the MDD latent variables
+MDD_6=~1*MDDCORE_14        # Defining the MDD latent variables
+
+#Define regressions
+Peer_2 ~ 1*Peer_1     # This parameter regresses PPeerScale_3 perfectly on PPeerScale_1
+Peer_3 ~ 1*Peer_2
+Peer_4 ~ 1*Peer_3
+Peer_5 ~ 1*Peer_4
+Peer_6 ~ 1*Peer_5
+
+MDD_2 ~ 1*MDD_1     # This parameter regresses MDD_2 perfectly on MDD_1
+MDD_3 ~ 1*MDD_2
+MDD_4 ~ 1*MDD_3
+MDD_5 ~ 1*MDD_4
+MDD_6 ~ 1*MDD_5
+
+#Define the change score
+dPeer_1 =~ 1*Peer_2        # This defines the change score as measured perfectly by scores on PPeerScale_3
+dPeer_2 =~ 1*Peer_3
+dPeer_3 =~ 1*Peer_4
+dPeer_4 =~ 1*Peer_5
+dPeer_5 =~ 1*Peer_6
+         
+dMDD_1 =~ 1*MDD_2           # This defines the change score as measured perfectly by scores on MDDCORE_3
+dMDD_2 =~ 1*MDD_3           
+dMDD_3 =~ 1*MDD_4
+dMDD_4 =~ 1*MDD_5
+dMDD_5 =~ 1*MDD_6
+
+#Estimate residual variances
+PPeerScale_1~~PPeerScale_1          # This estimates the PPeer residual variances
+PPeerScale_3~~PPeerScale_3
+PPeerScale_5~~PPeerScale_5
+PPeerScale_10~~PPeerScale_10
+PPeerScale_12~~PPeerScale_12
+PPeerScale_14~~PPeerScale_14
+
+TPeerScale_1~~TPeerScale_1          # This estimates the TPeer residual variances
+TPeerScale_3~~TPeerScale_3
+TPeerScale_5~~TPeerScale_5
+TPeerScale_10~~TPeerScale_10
+TPeerScale_12~~TPeerScale_12
+TPeerScale_14~~TPeerScale_14
+
+MDDCORE_1~~MDDCORE_1          # This estimates the MDDCORE residual variances
+MDDCORE_3~~MDDCORE_3
+MDDCORE_5~~MDDCORE_5
+MDDCORE_10~~MDDCORE_10
+MDDCORE_12~~MDDCORE_12
+MDDCORE_14~~MDDCORE_14
+
+#Dynamics
+
+#Estimate the self-feedback parameters
+dPeer_1~A1*Peer_1       # This estimates the Peer self-feedback parameter
+dPeer_2~A2*Peer_2
+dPeer_3~A3*Peer_3
+dPeer_4~A4*Peer_4
+dPeer_5~A5*Peer_5
+
+dMDD_1~B1*MDD_1       # This estimates the MDD self-feedback parameter
+dMDD_2~B2*MDD_2
+dMDD_3~B3*MDD_3
+dMDD_4~B4*MDD_4
+dMDD_5~B5*MDD_5
+
+#Estimate coupling parameter
+dMDD_1~C1*Peer_1         # This estimates the Peer to MDD coupling parameter
+dMDD_2~C2*Peer_2
+dMDD_3~C3*Peer_3
+dMDD_4~C4*Peer_4
+dMDD_5~C5*Peer_5
+
+dPeer_1~E1*MDD_1         # This estimates the MDD to Peer coupling parameter
+dPeer_2~E2*MDD_2
+dPeer_3~E3*MDD_3
+dPeer_4~E4*MDD_4
+dPeer_5~E5*MDD_5
+
+iPeer=~1*Peer_1                   # This defines the Peer intercept measurement model
+sPeer=~1*dPeer_1+ 1*dPeer_2+ 1*dPeer_3+ 1*dPeer_4+ 1*dPeer_5 # This defines the Peer slope measurement model
+iPeer~1                             # This estimates the Peer intercept intercept (mean)
+iPeer~~iPeer                         # This estimates the Peer intercept variance
+sPeer~1                             # This estimates the Peer slope intercept
+sPeer~~sPeer                         # This estimates the Peer slope variance
+
+iMDD=~1*MDD_1                   # This defines the MDD intercept measurement model
+sMDD=~1*dMDD_1+ 1*dMDD_2+ 1*dMDD_3+ 1*dMDD_4+ 1*dMDD_5 # This defines the MDD slope measurement model
+iMDD~1                             # This estimates the MDD intercept intercept (mean)
+iMDD~~iMDD                         # This estimates the MDD intercept variance
+sMDD~1                             # This estimates the MDD slope intercept
+sMDD~~sMDD                         # This estimates the MDD slope variance
+
+iMDD~~sMDD                      # This estimates the iMDD sMDD covariance
+iMDD~~sPeer                      # This estimates the iMDD sPeer covariance
+iMDD~~iPeer                      # This estimates the iMDD iPeer covariance
+iPeer~~sPeer                      # This estimates the iPeer sPeer covariance
+iPeer~~sMDD                      # This estimates the iPeer sMDD covariance
+sPeer~~sMDD                      # This estimates the sPeer sMDD covariance
+'
+
+fit_Peer_BMWLC <- lavaan(Peer_BMWLC, data=data_wide, missing="FIML")
+
+summary(fit_Peer_BMWLC, fit.measures=T, standardized=T)
+
+semPaths(fit_Peer_BMWLC, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+```
+Problematic assumptions: assumes measurement invariance & equal distance between assessments (which is true for the most part)
+Can test measurement invariance for all HBQ measures, but not for the MDD measures.
+Equal distance assumption should be fine since there is only 1 period that is unequal from the rest. Could try running the model from T6 on to see if the results show up the same.
+
+# Correlated change (Steyer) 
+Adapted from Leah Schultz's script
+```{r Correlated change (Steyer)}
+Peer_MWLC_2 <-'
+#Defining the latent variables
+Peer_1=~1*PPeerScale_1+1*TPeerScale_1        # Defining the Peer latent variables
+Peer_2=~1*PPeerScale_3+1*TPeerScale_3        # Defining the Peer latent variables
+Peer_3=~1*PPeerScale_5+1*TPeerScale_5        # Defining the Peer latent variables
+Peer_4=~1*PPeerScale_10+1*TPeerScale_10        # Defining the Peer latent variables
+Peer_5=~1*PPeerScale_12+1*TPeerScale_12        # Defining the Peer latent variables
+Peer_6=~1*PPeerScale_14+1*TPeerScale_14        # Defining the Peer latent variables
+
+MDD_1=~1*MDDCORE_1        # Defining the MDD latent variables
+MDD_2=~1*MDDCORE_3        # Defining the MDD latent variables
+MDD_3=~1*MDDCORE_5        # Defining the MDD latent variables
+MDD_4=~1*MDDCORE_10        # Defining the MDD latent variables
+MDD_5=~1*MDDCORE_12        # Defining the MDD latent variables
+MDD_6=~1*MDDCORE_14        # Defining the MDD latent variables
+
+#Not sure what this is doing!
+PPeerScale_1 ~ 0*1
+TPeerScale_1 ~ (pu1)*1
+PPeerScale_3 ~ 0*1
+TPeerScale_3 ~ (pu1)*1
+PPeerScale_5 ~ 0*1
+TPeerScale_5 ~ (pu1)*1
+PPeerScale_10 ~ 0*1
+TPeerScale_10 ~ (pu1)*1
+PPeerScale_12 ~ 0*1
+TPeerScale_12 ~ (pu1)*1
+PPeerScale_14 ~ 0*1
+TPeerScale_14 ~ (pu1)*1
+
+MDDCORE_1 ~ 0*1
+MDDCORE_3 ~ 0*1
+MDDCORE_5 ~ 0*1
+MDDCORE_10 ~ 0*1
+MDDCORE_12 ~ 0*1
+MDDCORE_14 ~ 0*1
+
+#Estimate residual variances
+PPeerScale_1~~PPeerScale_1          # This estimates the PPeer residual variances
+PPeerScale_3~~PPeerScale_3
+PPeerScale_5~~PPeerScale_5
+PPeerScale_10~~PPeerScale_10
+PPeerScale_12~~PPeerScale_12
+PPeerScale_14~~PPeerScale_14
+
+TPeerScale_1~~TPeerScale_1          # This estimates the TPeer residual variances
+TPeerScale_3~~TPeerScale_3
+TPeerScale_5~~TPeerScale_5
+TPeerScale_10~~TPeerScale_10
+TPeerScale_12~~TPeerScale_12
+TPeerScale_14~~TPeerScale_14
+
+MDDCORE_1~~MDDCORE_1          # This estimates the MDDCORE residual variances
+MDDCORE_3~~MDDCORE_3
+MDDCORE_5~~MDDCORE_5
+MDDCORE_10~~MDDCORE_10
+MDDCORE_12~~MDDCORE_12
+MDDCORE_14~~MDDCORE_14
+
+Peer_1 ~ 0*1
+Peer_2 ~ 0*1
+Peer_3 ~ 0*1
+Peer_4 ~ 0*1
+Peer_5 ~ 0*1
+Peer_6 ~ 0*1
+
+Peer_1 ~~ 0*Peer_1
+Peer_2 ~~ 0*Peer_2
+Peer_3 ~~ 0*Peer_3
+Peer_4 ~~ 0*Peer_4
+Peer_5 ~~ 0*Peer_5
+Peer_6 ~~ 0*Peer_6
+
+MDD_1 ~ 0*1
+MDD_2 ~ 0*1
+MDD_3 ~ 0*1
+MDD_4 ~ 0*1
+MDD_5 ~ 0*1
+MDD_6 ~ 0*1
+
+MDD_1 ~~ 0*MDD_1
+MDD_2 ~~ 0*MDD_2
+MDD_3 ~~ 0*MDD_3
+MDD_4 ~~ 0*MDD_4
+MDD_5 ~~ 0*MDD_5
+MDD_6 ~~ 0*MDD_6
+
+t1Peer =~ 1*Peer_1+ 1*Peer_2+ 1*Peer_3+ 1*Peer_4+ 1*Peer_5
+t1Peer ~~ t1Peer
+t1Peer ~ 1
+
+d2Peer =~ 1*Peer_2+ 1*Peer_3+ 1*Peer_4+ 1*Peer_5
+d2Peer ~~ d2Peer
+d2Peer ~ 1
+
+d3Peer =~ 1*Peer_3+ 1*Peer_4+ 1*Peer_5
+d3Peer ~~ d3Peer
+d3Peer ~ 1
+
+d4Peer =~ 1*Peer_4+ 1*Peer_5
+d4Peer ~~ d4Peer
+d4Peer ~ 1
+
+d5Peer =~ 1*Peer_5
+d5Peer ~~ d5Peer
+d5Peer ~ 1
+
+t1Peer ~~ d2Peer + d3Peer + d4Peer + d5Peer
+d2Peer ~~ d3Peer + d4Peer + d5Peer
+d3Peer ~~ d4Peer + d5Peer
+d4Peer ~~ d5Peer
+
+t1MDD =~ 1*MDD_1+ 1*MDD_2+ 1*MDD_3+ 1*MDD_4+ 1*MDD_5
+t1MDD ~~ t1MDD
+t1MDD ~ 1
+
+d2MDD =~ 1*MDD_2+ 1*MDD_3+ 1*MDD_4+ 1*MDD_5
+d2MDD ~~ d2MDD
+d2MDD ~ 1
+
+d3MDD =~ 1*MDD_3+ 1*MDD_4+ 1*MDD_5
+d3MDD ~~ d3MDD
+d3MDD ~ 1
+
+d4MDD =~ 1*MDD_4+ 1*MDD_5
+d4MDD ~~ d4MDD
+d4MDD ~ 1
+
+d5MDD =~ 1*MDD_5
+d5MDD ~~ d5MDD
+d5MDD ~ 1
+
+t1MDD ~~ d2MDD + d3MDD + d4MDD + d5MDD
+d2MDD ~~ d3MDD + d4MDD + d5MDD
+d3MDD ~~ d4MDD + d5MDD
+d4MDD ~~ d5MDD
+
+d2Peer ~~ 0*d3MDD + 0*d4MDD + 0*d5MDD
+d3Peer ~~ 0*d5MDD
+'
+
+fit_Peer_MWLC_2 <- sem(Peer_MWLC_2, missing="ML", data = data_wide)
+
+#Peer_MWLC_2_est <-parameterEstimates(fitN_cor_diff)
+#fitN_cor_diff_est<-fitN_cor_diff_est[c(194,199,202,206),]
+#fitN_cor_cfi<-fitMeasures(fitN_cor_diff, "cfi")
+#fitN_cor_cfi
+summary(fit_Peer_MWLC_2)
+semPaths(fit_Peer_MWLC_2, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+```
