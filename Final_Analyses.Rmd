@@ -193,30 +193,30 @@ MDDCORE_14~~MDDCORE_14
 #Dynamics
 
 #Estimate the self-feedback parameters
-dPeer_1~A1*Peer_1       # This estimates the Peer self-feedback parameter
-dPeer_2~A2*Peer_2
-dPeer_3~A3*Peer_3
-dPeer_4~A4*Peer_4
-dPeer_5~A5*Peer_5
+dPeer_1~Peer_1       # This estimates the Peer self-feedback parameter
+dPeer_2~Peer_2
+dPeer_3~Peer_3
+dPeer_4~Peer_4
+dPeer_5~Peer_5
 
-dMDD_1~B1*MDD_1       # This estimates the MDD self-feedback parameter
-dMDD_2~B2*MDD_2
-dMDD_3~B3*MDD_3
-dMDD_4~B4*MDD_4
-dMDD_5~B5*MDD_5
+dMDD_1~MDD_1       # This estimates the MDD self-feedback parameter
+dMDD_2~MDD_2
+dMDD_3~MDD_3
+dMDD_4~MDD_4
+dMDD_5~MDD_5
 
 #Estimate coupling parameter
-dMDD_1~C1*Peer_1         # This estimates the Peer to MDD coupling parameter
-dMDD_2~C2*Peer_2
-dMDD_3~C3*Peer_3
-dMDD_4~C4*Peer_4
-dMDD_5~C5*Peer_5
+dMDD_1~Peer_1         # This estimates the Peer to MDD coupling parameter
+dMDD_2~Peer_2
+dMDD_3~Peer_3
+dMDD_4~Peer_4
+dMDD_5~Peer_5
 
-dPeer_1~E1*MDD_1         # This estimates the MDD to Peer coupling parameter
-dPeer_2~E2*MDD_2
-dPeer_3~E3*MDD_3
-dPeer_4~E4*MDD_4
-dPeer_5~E5*MDD_5
+dPeer_1~MDD_1         # This estimates the MDD to Peer coupling parameter
+dPeer_2~MDD_2
+dPeer_3~MDD_3
+dPeer_4~MDD_4
+dPeer_5~MDD_5
 
 iPeer=~1*Peer_1                   # This defines the Peer intercept measurement model
 sPeer=~1*dPeer_1+ 1*dPeer_2+ 1*dPeer_3+ 1*dPeer_4+ 1*dPeer_5 # This defines the Peer slope measurement model
