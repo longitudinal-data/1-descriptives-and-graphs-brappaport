@@ -29,7 +29,8 @@ library(lavaan) ##need this to run the analyses
 library(ggthemes) ##to help make graphs
 library(ggrepel) ##to help make graphs
 library(papaja)
-
+library(lavaanPlot)
+library(DiagrammeR)
 
 data_wide <- read.csv("/Users/BrentRappaport/Box Sync/WashU/Classes/Longtudinal Methods/1-descriptives-and-graphs-brappaport/Rappaport_data.csv")
 data_wide <- data_wide[,-1]
@@ -43,6 +44,9 @@ data_wide <- data_wide %>%
          MDDPRP100_14 = MDDPRP_14*100,
          MDDPRP100_16 = MDDPRP_16*100,
          MDDPRP100_18 = MDDPRP_18*100)
+```
+
+```{r Convert data to long form}
 
 #Convert data to long form
 data_long <- data_wide[,c(1:2,7190:7229)]
@@ -77,6 +81,7 @@ data_long$wave <- as.integer(data_long$wave)
 #sort by id
 data_long <- data_long[order(data_long$ID),] 
 ```
+
 
 Descriptive statistics
 ```{r Descriptive statistics}
@@ -161,6 +166,9 @@ alpha_Peer_10 <- alpha(data_wide[,c("T6hbqPPeer1","T6hbqPPeer2","T6hbqPPeer3","T
 alpha_Peer_12 <- alpha(data_wide[,c("T8hbqPPeer1","T8hbqPPeer2","T8hbqPPeer3","T8hbqPPeer4","T8hbqPPeer5","T8hbqPPeer6","T8hbqPPeer7","T8hbqPPeer8","T8hbqPPeer9","T8hbqPPeer10","T8hbqPPeer11")],na.rm=T); alpha_Peer_12
 
 alpha_Peer_14 <- alpha(data_wide[,c("T10hbqh14a","T10hbqh14br","T10hbqh14cr","T10hbqh14dr","T10hbqh14er","T10hbqh14fr","T10hbqh14g","T10hbqh14hr","T10hbqh14ir","T10hbqh14jr","T10hbqh14kr")],na.rm=T); alpha_Peer_14
+
+
+#Teacher report
 ```
 
 Bivariate multiwave latent change model for Peer score
@@ -286,14 +294,12 @@ summary(fit_Peer_BMWLC, fit.measures=T, standardized=T)
 
 #Figure 1: Theoretical model
 semPaths(fit_Peer_BMWLC, 'mod', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
-         label.cex=T, label.scale=T, normalize=F, sizeMan=4, sizeInt=2, sizeLat=3, intercepts=F)
+         label.cex=T, label.scale=T, normalize=F, sizeMan=4, sizeInt=2, sizeLat=3, intercepts=F, residuals=T)
 
 semPaths(fit_Peer_BMWLC, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
          label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
 
 fit_Peer_BMWLC_sf_c_parameters <- parameterEstimates(fit_Peer_BMWLC)[57:76,]
-
-
 ```
 Problematic assumptions: assumes measurement invariance & equal distance between assessments (which is true for the most part)
 Can test measurement invariance for all HBQ measures, but not for the MDD measures.
@@ -549,6 +555,8 @@ summary(fit_PPeer_BMWLC_IS2, fit.measures=T, standardized=T)
 
 semPaths(fit_PPeer_BMWLC_IS2, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
          label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+
+lavaanPlot(fit_PPeer_BMWLC_IS2)
 ```
 
 
@@ -669,8 +677,7 @@ iPeer~~sMDD                      # This estimates the iPeer sMDD covariance
 sPeer~~sMDD                      # This estimates the sPeer sMDD covariance
 '
 
-fit_PPeer_BMWLC_T2 <- lavaan(PPeer_BMWLC_T2, data=data_wide, missing="FIML",
-                             control=list(iter.min=10000))
+fit_PPeer_BMWLC_T2 <- lavaan(PPeer_BMWLC_T2, data=data_wide, missing="FIML")
 
 summary(fit_PPeer_BMWLC_T2, fit.measures=T, standardized=T)
 
@@ -1493,157 +1500,74 @@ semPaths(fit_PPeer_BMWLC_T, 'std', 'est', curveAdjacent=T, layout="tree", orthog
 ```
 
 
-# Correlated change (Steyer) 
-Adapted from Leah Schultz's script
-```{r Correlated change (Steyer)}
-Peer_MWLC_2 <-'
-#Defining the latent variables
-Peer_1=~1*PPeer1+1*TPeer1        # Defining the Peer latent variables
-Peer_2=~1*PPeer3+1*TPeer3        # Defining the Peer latent variables
-Peer_3=~1*PPeer5+1*TPeer5        # Defining the Peer latent variables
-Peer_4=~1*PPeer10+1*TPeer10        # Defining the Peer latent variables
-Peer_5=~1*PPeer12+1*TPeer12        # Defining the Peer latent variables
-Peer_6=~1*PPeer14+1*TPeer14        # Defining the Peer latent variables
+#SEM Plots
+```{r SEM Plots}
+lavaanPlot(model = fit_Peer_BMWLC, node_options = list(shape = "circle", fontname = "Helvetica"), edge_options = list(color = "grey"))
 
-MDD_1=~1*MDDCORE_1        # Defining the MDD latent variables
-MDD_2=~1*MDDCORE_3        # Defining the MDD latent variables
-MDD_3=~1*MDDCORE_5        # Defining the MDD latent variables
-MDD_4=~1*MDDCORE_10        # Defining the MDD latent variables
-MDD_5=~1*MDDCORE_12        # Defining the MDD latent variables
-MDD_6=~1*MDDCORE_14        # Defining the MDD latent variables
+# To describe edges, we need the origin, path-type, endpoint, and label.
+paths <- fit_Peer_BMWLC %>%
+  parameterestimates %>%
+  select(lhs, op, rhs, est)
 
-#Not sure what this is doing!
-PPeer1 ~ 0*1
-TPeer1 ~ (pu1)*1
-PPeer3 ~ 0*1
-TPeer3 ~ (pu1)*1
-PPeer5 ~ 0*1
-TPeer5 ~ (pu1)*1
-PPeer10 ~ 0*1
-TPeer10 ~ (pu1)*1
-PPeer12 ~ 0*1
-TPeer12 ~ (pu1)*1
-PPeer14 ~ 0*1
-TPeer14 ~ (pu1)*1
+# Latent variables are left-hand side of "=~" lines
+latent <- paths %>%
+  filter(op == "=~") %>%
+  select(nodes = lhs) %>%
+  distinct %>%
+  mutate(shape = "circle")
 
-MDDCORE_1 ~ 0*1
-MDDCORE_3 ~ 0*1
-MDDCORE_5 ~ 0*1
-MDDCORE_10 ~ 0*1
-MDDCORE_12 ~ 0*1
-MDDCORE_14 ~ 0*1
+# This is a node data-frame now
+latent
 
-#Estimate residual variances
-PPeer1~~PPeer1          # This estimates the PPeer residual variances
-PPeer3~~PPeer3
-PPeer5~~PPeer5
-PPeer10~~PPeer10
-PPeer12~~PPeer12
-PPeer14~~PPeer14
+# Manifest variables are not latent variables
+`%not_in%` <- Negate(`%in%`)
+manifest <- paths %>%
+  filter(op != "~1", lhs %not_in% latent$nodes) %>%
+  select(nodes = lhs) %>%
+  distinct %>%
+  mutate(shape = "square") %>%
+  mutate(type = "type_1")
 
-TPeer1~~TPeer1          # This estimates the TPeer residual variances
-TPeer3~~TPeer3
-TPeer5~~TPeer5
-TPeer10~~TPeer10
-TPeer12~~TPeer12
-TPeer14~~TPeer14
+# Nodes are prepared
+node_set <- combine_ndfs(latent, manifest)
+node_set[,3] <- "type_1"
+colnames(node_set[3]) <- "type"
 
-MDDCORE_1~~MDDCORE_1          # This estimates the MDDCORE residual variances
-MDDCORE_3~~MDDCORE_3
-MDDCORE_5~~MDDCORE_5
-MDDCORE_10~~MDDCORE_10
-MDDCORE_12~~MDDCORE_12
-MDDCORE_14~~MDDCORE_14
+# Edges will be labeled by the parameter estimates
+all_paths <- paths %>%
+  filter(op != "~1") %>%
+  mutate(label = round(est, 2)) %>%
+  select(-est)
 
-Peer_1 ~ 0*1
-Peer_2 ~ 0*1
-Peer_3 ~ 0*1
-Peer_4 ~ 0*1
-Peer_5 ~ 0*1
-Peer_6 ~ 0*1
+# Factor loadings are the paths in the "=~" lines
+loadings <- all_paths %>%
+  filter(op == "=~") %>%
+  mutate(edge_from = lhs, edge_to = rhs, style = "dashed") %>%
+  select(edge_from, edge_to, style, label)
 
-Peer_1 ~~ 0*Peer_1
-Peer_2 ~~ 0*Peer_2
-Peer_3 ~~ 0*Peer_3
-Peer_4 ~~ 0*Peer_4
-Peer_5 ~~ 0*Peer_5
-Peer_6 ~~ 0*Peer_6
+# This is now an edge dataframe
+loadings
 
-MDD_1 ~ 0*1
-MDD_2 ~ 0*1
-MDD_3 ~ 0*1
-MDD_4 ~ 0*1
-MDD_5 ~ 0*1
-MDD_6 ~ 0*1
+# Regressions are the paths in the "~" lines
+regressions <- all_paths %>%
+  filter(op == "~") %>%
+  rename(edge_to = lhs, edge_from = rhs) %>%
+  mutate(style = "solid") %>%
+  select(edge_from, edge_to, style, label)
 
-MDD_1 ~~ 0*MDD_1
-MDD_2 ~~ 0*MDD_2
-MDD_3 ~~ 0*MDD_3
-MDD_4 ~~ 0*MDD_4
-MDD_5 ~~ 0*MDD_5
-MDD_6 ~~ 0*MDD_6
+edge_set <- combine_edfs(loadings, regressions)
+#edge_set <- edge_set[,-5]
 
-t1Peer =~ 1*Peer_1+ 1*Peer_2+ 1*Peer_3+ 1*Peer_4+ 1*Peer_5
-t1Peer ~~ t1Peer
-t1Peer ~ 1
+# What's missing? Covariance/variance (~~) and intercept (~1) paths
 
-d2Peer =~ 1*Peer_2+ 1*Peer_3+ 1*Peer_4+ 1*Peer_5
-d2Peer ~~ d2Peer
-d2Peer ~ 1
+# Combine edges and nodes
+my_graph <- create_graph(
+  node_set,edge_set)
+  
 
-d3Peer =~ 1*Peer_3+ 1*Peer_4+ 1*Peer_5
-d3Peer ~~ d3Peer
-d3Peer ~ 1
 
-d4Peer =~ 1*Peer_4+ 1*Peer_5
-d4Peer ~~ d4Peer
-d4Peer ~ 1
+  graph_attrs = c("ranksep = 1"))
 
-d5Peer =~ 1*Peer_5
-d5Peer ~~ d5Peer
-d5Peer ~ 1
-
-t1Peer ~~ d2Peer + d3Peer + d4Peer + d5Peer
-d2Peer ~~ d3Peer + d4Peer + d5Peer
-d3Peer ~~ d4Peer + d5Peer
-d4Peer ~~ d5Peer
-
-t1MDD =~ 1*MDD_1+ 1*MDD_2+ 1*MDD_3+ 1*MDD_4+ 1*MDD_5
-t1MDD ~~ t1MDD
-t1MDD ~ 1
-
-d2MDD =~ 1*MDD_2+ 1*MDD_3+ 1*MDD_4+ 1*MDD_5
-d2MDD ~~ d2MDD
-d2MDD ~ 1
-
-d3MDD =~ 1*MDD_3+ 1*MDD_4+ 1*MDD_5
-d3MDD ~~ d3MDD
-d3MDD ~ 1
-
-d4MDD =~ 1*MDD_4+ 1*MDD_5
-d4MDD ~~ d4MDD
-d4MDD ~ 1
-
-d5MDD =~ 1*MDD_5
-d5MDD ~~ d5MDD
-d5MDD ~ 1
-
-t1MDD ~~ d2MDD + d3MDD + d4MDD + d5MDD
-d2MDD ~~ d3MDD + d4MDD + d5MDD
-d3MDD ~~ d4MDD + d5MDD
-d4MDD ~~ d5MDD
-
-d2Peer ~~ 0*d3MDD + 0*d4MDD + 0*d5MDD
-d3Peer ~~ 0*d5MDD
-'
-
-fit_Peer_MWLC_2 <- sem(Peer_MWLC_2, missing="ML", data = data_wide)
-
-#Peer_MWLC_2_est <-parameterEstimates(fitN_cor_diff)
-#fitN_cor_diff_est<-fitN_cor_diff_est[c(194,199,202,206),]
-#fitN_cor_cfi<-fitMeasures(fitN_cor_diff, "cfi")
-#fitN_cor_cfi
-summary(fit_Peer_MWLC_2)
-semPaths(fit_Peer_MWLC_2, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
-         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+# We can plot the graph directly
+render_graph(my_graph)
 ```
