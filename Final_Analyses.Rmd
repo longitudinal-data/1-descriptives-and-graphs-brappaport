@@ -245,6 +245,9 @@ alpha_TPro_12 <- alpha(data_wide[,c("T8hbqTPro1","T8hbqTPro2","T8hbqTPro3","T8hb
 alpha_TPro_14 <- alpha(data_wide[,c("T10hbqt17c","T10hbqt17d","T10hbqt17e","T10hbqt17h","T10hbqt17i","T10hbqt17j")],na.rm=T); alpha_TPro_14
 ```
 
+#Explanation of models
+5 main models: First, a baseline model where coupling parameters are fixed to 0. Second, an “interpersonal risk” model where coupling coefficients from dMDD ~ Peer (change in MDD symptoms predicted by Peer relations) are non-zero but are fixed across time. Third, an "interpersonal scar" model where coupling coefficients from dPeer ~ MDD (change in Peer relations predicted by MDD) are non-zero but are fixed across time. Fourth, a "transactional" model where coupling cofficients from Peer to dMDD and MDD to dPeer are non-zero but fixed across time. Fifth, a model where all coupling parameters (dPeer ~ MDD and dMDD ~ Peer) are free to vary over time. 
+
 ##Bivariate multiwave latent change model for Peer score
 ###Using composite parent and teacher-report scores
 ```{r BMWLC model for Peer score with composite scores}
@@ -498,7 +501,7 @@ iPeer~~sMDD                      # This estimates the iPeer sMDD covariance
 sPeer~~sMDD                      # This estimates the sPeer sMDD covariance
 '
 
-fit_Peer_BMWLC_NR2 <- lavaan(Peer_BMWLC_NR2, data=data_wide, missing="FIML")
+fit_Peer_BMWLC_NR2 <- lavaan(Peer_BMWLC_NR2, data=data_wide, missing="FIML", estimator="MLR")
 inspect(fit_Peer_BMWLC_IR2,"cor.lv")
 
 summary(fit_Peer_BMWLC_NR2, fit.measures=T, standardized=T)
@@ -624,7 +627,7 @@ iPeer~~sMDD                      # This estimates the iPeer sMDD covariance
 sPeer~~sMDD                      # This estimates the sPeer sMDD covariance
 '
 
-fit_Peer_BMWLC_IR2 <- lavaan(Peer_BMWLC_IR2, data=data_wide, missing="FIML")
+fit_Peer_BMWLC_IR2 <- lavaan(Peer_BMWLC_IR2, data=data_wide, missing="FIML", estimator="MLR")
 inspect(fit_Peer_BMWLC_IR2,"cor.lv")
 
 summary(fit_Peer_BMWLC_IR2, fit.measures=T, standardized=T)
@@ -750,7 +753,7 @@ iPeer~~sMDD                      # This estimates the iPeer sMDD covariance
 sPeer~~sMDD                      # This estimates the sPeer sMDD covariance
 '
 
-fit_Peer_BMWLC_IS2 <- lavaan(Peer_BMWLC_IS2, data=data_wide, missing="FIML")
+fit_Peer_BMWLC_IS2 <- lavaan(Peer_BMWLC_IS2, data=data_wide, missing="FIML", estimator="MLR")
 inspect(fit_Peer_BMWLC_IS2,"cor.lv")
 
 summary(fit_Peer_BMWLC_IS2, fit.measures=T, standardized=T)
@@ -888,6 +891,9 @@ semPaths(fit_Peer_BMWLC_T2, 'std', 'est', curveAdjacent=T, layout="tree", orthog
 
 
 
+
+
+There are the same models as above but using item-level data. They typically did not converge, therefore the composite scores are used instead.
 
 ##Bivariate multiwave latent change model for Peer score with parent-report item level observed variables
 ###Using item-level parent-report scores
