@@ -1,7 +1,7 @@
 ---
-title: "Final_Analyses"
+title: "Final Analyses"
 author: "Brent Rappaport"
-date: "12/6/2017"
+date: "01/13/2018"
 output: html_document
 ---
 
@@ -47,7 +47,6 @@ data_wide <- data_wide %>%
 ```
 
 ```{r Convert data to long form}
-
 #Convert data to long form
 data_long <- data_wide[,c(1:2,7190:7229)]
 data_long <- data_wide %>% 
@@ -95,12 +94,12 @@ Peer_descriptives[,8:10] <- describe(data_wide[,c("MDDCORE_1","MDDCORE_3","MDDCO
                                                  "MDDCORE_16","MDDCORE_18")])[2:4]
 Peer_descriptives[,1] <- describe(data_wide[,c("age_1","age_3","age_5","age_10","age_12",
                        "age_14")])[3]
-Peer_descriptives
 
 colnames(Peer_descriptives) <- c("Age","Parent-report N","Parent-report Mean","Parent-report SD",
                                  "Teacher-report N","Teacher-report Mean","Teacher-report SD",
                                  "MDD Core Symptoms N","MDD Core Symptoms Mean","MDD Core Symptoms SD")
 
+Peer_descriptives
 
 #Relationship betweem MDDCORE and MDDPRP
 cor(data_wide[,c("MDDCORE_1","MDDCORE_3","MDDCORE_5","MDDCORE_10","MDDCORE_12",
@@ -127,8 +126,10 @@ ggplot(data_long,aes(age,PPeer,group=ID)) +
   theme(text=element_text(lineheight=1, face="bold", size=15), 
         legend.position="none")
 
+hist(data_wide$PPeer1)
+
 ggplot(data_long,aes(age,PPeer,group=ID,color=factor(sex))) +
-  geom_line(alpha=.5) +
+  geom_line(alpha=.25) +
   scale_color_manual(values=c("#377EB8","#E41A1C"),
                      name ="Sex", breaks=c(1,2),
                          labels=c("Male","Female")) +
@@ -145,6 +146,13 @@ ggplot(data_long,aes(age,MDDCORE,group=ID)) +
   theme(text=element_text(lineheight=1, face="bold", size=15), 
         legend.position="none")
 
+ggplot(data_long,aes(age,MDDCORE,group=ID,color=factor(sex))) +
+  geom_line(alpha=.5) +
+  stat_smooth(aes(group=factor(sex)),method="lm",size=1,se=T,linetype="longdash") + 
+  labs(x="Age",y="MDD Core Symptoms") +
+  theme(text=element_text(lineheight=1, face="bold", size=15), 
+        legend.position="none")
+
 ggplot(data_long,aes(age,MDDPRP,group=ID)) +
   geom_line(alpha=.5) +
   stat_smooth(aes(group=1),method="lm",size=1,se=T,linetype="longdash") + 
@@ -153,26 +161,93 @@ ggplot(data_long,aes(age,MDDPRP,group=ID)) +
         legend.position="none")
 ```
 
-#Internal consistency
-```{r Internal consistency}
-alpha_Peer_1 <- alpha(data_wide[,c("T1hbq17","T1hbq18r","T1hbq19r","T1hbq21r","T1hbq22r","T1hbq23r","T1hbq24","T1hbq25r","T1hbq26r","T1hbq28r","T1hbq29r")],na.rm=T); alpha_Peer_1
-
-alpha_Peer_3 <- alpha(data_wide[,c("T3hbq17","T3hbq18r","T3hbq19r","T3hbq21r","T3hbq22r","T3hbq23r","T3hbq24","T3hbq26r","T3hbq25r","T3hbq28r","T3hbq29r")],na.rm=T); alpha_Peer_3
-
-alpha_Peer_5 <- alpha(data_wide[,c("T5hbq17","T5hbq18r","T5hbq19r","T5hbq21r","T5hbq22r","T5hbq23r","T5hbq24","T5hbq25r","T5hbq26r","T5hbq28r","T5hbq29r")],na.rm=T); alpha_Peer_5
-
-alpha_Peer_10 <- alpha(data_wide[,c("T6hbqPPeer1","T6hbqPPeer2","T6hbqPPeer3","T6hbqPPeer4","T6hbqPPeer5","T6hbqPPeer6","T6hbqPPeer7","T6hbqPPeer8","T6hbqPPeer9","T6hbqPPeer10","T6hbqPPeer11")],na.rm=T); alpha_Peer_10
-
-alpha_Peer_12 <- alpha(data_wide[,c("T8hbqPPeer1","T8hbqPPeer2","T8hbqPPeer3","T8hbqPPeer4","T8hbqPPeer5","T8hbqPPeer6","T8hbqPPeer7","T8hbqPPeer8","T8hbqPPeer9","T8hbqPPeer10","T8hbqPPeer11")],na.rm=T); alpha_Peer_12
-
-alpha_Peer_14 <- alpha(data_wide[,c("T10hbqh14a","T10hbqh14br","T10hbqh14cr","T10hbqh14dr","T10hbqh14er","T10hbqh14fr","T10hbqh14g","T10hbqh14hr","T10hbqh14ir","T10hbqh14jr","T10hbqh14kr")],na.rm=T); alpha_Peer_14
-
-
-#Teacher report
+#Histograms
+```{r Histograms}
+hist(data_wide$PPeer1+data_wide$TPeer1, breaks = c(seq(2,8,.1)))
+hist(data_wide$PPeer3+data_wide$TPeer3, breaks = c(seq(2,8,.1)))
+hist(data_wide$PPeer5+data_wide$TPeer5, breaks = c(seq(2,8,.1)))
+hist(data_wide$PPeer10+data_wide$TPeer10, breaks = c(seq(2,8,.1)))
+hist(data_wide$PPeer12+data_wide$TPeer12, breaks = c(seq(2,8,.1)))
+hist(data_wide$PPeer14+data_wide$TPeer14, breaks = c(seq(2,8,.1)))
 ```
 
-Bivariate multiwave latent change model for Peer score
-```{r Bivariate multiwave latent change model for Peer score}
+#Internal consistency
+```{r Internal consistency}
+#Peer
+##Parent report
+alpha_PPeer_1 <- alpha(data_wide[,c("T1hbq17","T1hbq18r","T1hbq19r","T1hbq21r","T1hbq22r","T1hbq23r","T1hbq24","T1hbq25r","T1hbq26r","T1hbq28r","T1hbq29r")],na.rm=T); alpha_PPeer_1
+alpha_PPeer_3 <- alpha(data_wide[,c("T3hbq17","T3hbq18r","T3hbq19r","T3hbq21r","T3hbq22r","T3hbq23r","T3hbq24","T3hbq26r","T3hbq25r","T3hbq28r","T3hbq29r")],na.rm=T); alpha_PPeer_3
+alpha_PPeer_5 <- alpha(data_wide[,c("T5hbq17","T5hbq18r","T5hbq19r","T5hbq21r","T5hbq22r","T5hbq23r","T5hbq24","T5hbq25r","T5hbq26r","T5hbq28r","T5hbq29r")],na.rm=T); alpha_PPeer_5
+alpha_PPeer_10 <- alpha(data_wide[,c("T6hbqPPeer1","T6hbqPPeer2","T6hbqPPeer3","T6hbqPPeer4","T6hbqPPeer5","T6hbqPPeer6","T6hbqPPeer7","T6hbqPPeer8","T6hbqPPeer9","T6hbqPPeer10","T6hbqPPeer11")],na.rm=T); alpha_PPeer_10
+alpha_PPeer_12 <- alpha(data_wide[,c("T8hbqPPeer1","T8hbqPPeer2","T8hbqPPeer3","T8hbqPPeer4","T8hbqPPeer5","T8hbqPPeer6","T8hbqPPeer7","T8hbqPPeer8","T8hbqPPeer9","T8hbqPPeer10","T8hbqPPeer11")],na.rm=T); alpha_PPeer_12
+alpha_PPeer_14 <- alpha(data_wide[,c("T10hbqh14a","T10hbqh14br","T10hbqh14cr","T10hbqh14dr","T10hbqh14er","T10hbqh14fr","T10hbqh14g","T10hbqh14hr","T10hbqh14ir","T10hbqh14jr","T10hbqh14kr")],na.rm=T); alpha_PPeer_14
+
+##Teacher report
+alpha_TPeer_1 <- alpha(data_wide[,c("T1hbqt10","T1hbqt11r","T1hbqt12r","T1hbqt14r","T1hbqt15r","T1hbqt16r","T1hbqt17","T1hbqt18r","T1hbqt19r","T1hbqt21r","T1hbqt22r")],na.rm=T); alpha_TPeer_1
+alpha_TPeer_3 <- alpha(data_wide[,c("T3hbqt10","T3hbqt11r","T3hbqt12r","T3hbqt14r","T3hbqt15r","T3hbqt16r","T3hbqt17","T3hbqt18r","T3hbqt19r","T3hbqt21r","T3hbqt22r")],na.rm=T); alpha_TPeer_3
+alpha_TPeer_5 <- alpha(data_wide[,c("T5hbqt10","T5hbqt11r","T5hbqt12r","T5hbqt14r","T5hbqt15r","T5hbqt16r","T5hbqt17","T5hbqt18r","T5hbqt19r","T5hbqt21r","T5hbqt22r")],na.rm=T); alpha_TPeer_5
+alpha_TPeer_10 <- alpha(data_wide[,c("T6hbqTPeer1","T6hbqTPeer2","T6hbqTPeer3","T6hbqTPeer4","T6hbqTPeer5","T6hbqTPeer6","T6hbqTPeer7","T6hbqTPeer8","T6hbqTPeer9","T6hbqTPeer10","T6hbqTPeer11")],na.rm=T); alpha_TPeer_10
+alpha_TPeer_12 <- alpha(data_wide[,c("T8hbqTPeer1","T8hbqTPeer2","T8hbqTPeer3","T8hbqTPeer4","T8hbqTPeer5","T8hbqTPeer6","T8hbqTPeer7","T8hbqTPeer8","T8hbqTPeer9","T8hbqTPeer10","T8hbqTPeer11")],na.rm=T); alpha_TPeer_12
+alpha_TPeer_14 <- alpha(data_wide[,c("T10hbqt13a","T10hbqt13br","T10hbqt13cr","T10hbqt13dr","T10hbqt13er","T10hbqt13fr","T10hbqt13g","T10hbqt13hr","T10hbqt13ir","T10hbqt13jr","T10hbqt13kr")],na.rm=T); alpha_TPeer_14
+
+
+#Social Withdrawal
+##Parent report
+alpha_PSw_1 <- alpha(data_wide[,c("T1hbq76r","T1hbq92r","T1hbq100r","T1hbq106r","T1hbq117r","T1hbq131r","T1hbq144r")],na.rm=T); alpha_PSw_1
+alpha_PSw_3 <- alpha(data_wide[,c("T3hbq76r","T3hbq92r","T3hbq100r","T3hbq106r","T3hbq117r","T3hbq131r","T3hbq144r")],na.rm=T); alpha_PSw_3
+alpha_PSw_5 <- alpha(data_wide[,c("T5hbq76r","T5hbq92r","T5hbq100r","T5hbq106r","T5hbq117r","T5hbq131r","T5hbq144r")],na.rm=T); alpha_PSw_5
+alpha_PSw_10 <- alpha(data_wide[,c("T6hbqPSw1","T6hbqPSw2","T6hbqPSw3","T6hbqPSw4","T6hbqPSw5","T6hbqPSw6","T6hbqPSw7")],na.rm=T); alpha_PSw_10
+alpha_PSw_12 <- alpha(data_wide[,c("T8hbqPSw1","T8hbqPSw2","T8hbqPSw3","T8hbqPSw4","T8hbqPSw5","T8hbqPSw6","T8hbqPSw7")],na.rm=T); alpha_PSw_12
+alpha_PSw_14 <- alpha(data_wide[,c("T10hbqs49r","T10hbqs10r","T10hbqs31r","T10hbqs42r","T10hbqs65r","T10hbqs84r","T10hbqs100r")],na.rm=T); alpha_PSw_14
+
+##Teacher report
+alpha_TSw_1 <- alpha(data_wide[,c("T1hbqt74r","T1hbqt85r","T1hbqt91r","T1hbqt96r","T1hbqt106r","T1hbqt117r","T1hbqt130r")],na.rm=T); alpha_TSw_1
+alpha_TSw_3 <- alpha(data_wide[,c("T3hbqt74r","T3hbqt85r","T3hbqt91r","T3hbqt96r","T3hbqt106r","T3hbqt117r","T3hbqt130r")],na.rm=T); alpha_TSw_3
+alpha_TSw_5 <- alpha(data_wide[,c("T5hbqt74r","T5hbqt85r","T5hbqt91r","T5hbqt96r","T5hbqt106r","T5hbqt117r","T5hbqt130r")],na.rm=T); alpha_TSw_5
+alpha_TSw_10 <- alpha(data_wide[,c("T6hbqTSw1","T6hbqTSw2","T6hbqTSw3","T6hbqTSw4","T6hbqTSw5","T6hbqTSw6","T6hbqTSw7")],na.rm=T); alpha_TSw_10
+alpha_TSw_12 <- alpha(data_wide[,c("T8hbqTSw1","T8hbqTSw2","T8hbqTSw3","T8hbqTSw4","T8hbqTSw5","T8hbqTSw6","T8hbqTSw7")],na.rm=T); alpha_TSw_12
+alpha_TSw_14 <- alpha(data_wide[,c("T10hbqtb8r","T10hbqtb26r","T10hbqtb33r","T10hbqtb39r","T10hbqtb54r","T10hbqtb70r","T10hbqtb86r")],na.rm=T); alpha_TSw_14
+
+
+#Aggression
+##Parent report
+alpha_PAgg_1 <- alpha(data_wide[,c("T1hbq70","T1hbq83","T1hbq85","T1hbq96","T1hbq108","T1hbq127","T1hbq135","T1hbq139")],na.rm=T); alpha_PAgg_1
+alpha_PAgg_3 <- alpha(data_wide[,c("T3hbq70","T3hbq83","T3hbq85","T3hbq96","T3hbq108","T3hbq127","T3hbq135","T3hbq139")],na.rm=T); alpha_PAgg_3
+alpha_PAgg_5 <- alpha(data_wide[,c("T5hbq70","T5hbq83","T5hbq85","T5hbq96","T5hbq108","T5hbq127","T5hbq135","T5hbq139")],na.rm=T); alpha_PAgg_5
+alpha_PAgg_10 <- alpha(data_wide[,c("T6hbqPAgg1","T6hbqPAgg2","T6hbqPAgg3","T6hbqPAgg4","T6hbqPAgg5","T6hbqPAgg6","T6hbqPAgg7","T6hbqPAgg8")],na.rm=T); alpha_PAgg_10
+alpha_PAgg_12 <- alpha(data_wide[,c("T8hbqPAgg1","T8hbqPAgg2","T8hbqPAgg3","T8hbqPAgg4","T8hbqPAgg5","T8hbqPAgg6","T8hbqPAgg7","T8hbqPAgg8")],na.rm=T); alpha_PAgg_12
+alpha_PAgg_14 <- alpha(data_wide[,c("T10hbqs4","T10hbqs20","T10hbqs38","T10hbqs51","T10hbqs80","T10hbqs94","T10hbqs23","T10hbqs89")],na.rm=T); alpha_PAgg_14
+
+##Teacher report
+alpha_TAgg_1 <- alpha(data_wide[,c("T1hbqt70","T1hbqt79","T1hbqt81","T1hbqt88","T1hbqt98","T1hbqt114","T1hbqt120","T1hbqt124")],na.rm=T); alpha_TAgg_1
+alpha_TAgg_3 <- alpha(data_wide[,c("T3hbqt70","T3hbqt79","T3hbqt81","T3hbqt88","T3hbqt98","T3hbqt114","T3hbqt120","T3hbqt124")],na.rm=T); alpha_TAgg_3
+alpha_TAgg_5 <- alpha(data_wide[,c("T5hbqt70","T5hbqt79","T5hbqt81","T5hbqt88","T5hbqt98","T5hbqt114","T5hbqt120","T5hbqt124")],na.rm=T); alpha_TAgg_5
+alpha_TAgg_10 <- alpha(data_wide[,c("T6hbqTAgg1","T6hbqTAgg2","T6hbqTAgg3","T6hbqTAgg4","T6hbqTAgg5","T6hbqTAgg6","T6hbqTAgg7","T6hbqTAgg8")],na.rm=T); alpha_TAgg_10
+alpha_TAgg_12 <- alpha(data_wide[,c("T8hbqTAgg1","T8hbqTAgg2","T8hbqTAgg3","T8hbqTAgg4","T8hbqTAgg5","T8hbqTAgg6","T8hbqTAgg7","T8hbqTAgg8")],na.rm=T); alpha_TAgg_12
+alpha_TAgg_14 <- alpha(data_wide[,c("T10hbqtb4","T10hbqtb16","T10hbqtb30","T10hbqtb41","T10hbqtb67","T10hbqtb79","T10hbqtb19","T10hbqtb74")],na.rm=T); alpha_TAgg_14
+
+
+#Prosocial
+##Parent report
+alpha_PPro_1 <- alpha(data_wide[,c("T1hbq49","T1hbq53","T1hbq56","T1hbq58","T1hbq59","T1hbq61")],na.rm=T); alpha_PPro_1
+alpha_PPro_3 <- alpha(data_wide[,c("T3hbq49","T3hbq53","T3hbq56","T3hbq58","T3hbq59","T3hbq61")],na.rm=T); alpha_PPro_3
+alpha_PPro_5 <- alpha(data_wide[,c("T5hbq49","T5hbq53","T5hbq56","T5hbq58","T5hbq59","T5hbq61")],na.rm=T); alpha_PPro_5
+alpha_PPro_10 <- alpha(data_wide[,c("T6hbqPPro1","T6hbqPPro2","T6hbqPPro3","T6hbqPPro4","T6hbqPPro5","T6hbqPPro6")],na.rm=T); alpha_PPro_10
+alpha_PPro_12 <- alpha(data_wide[,c("T8hbqPPro1","T8hbqPPro2","T8hbqPPro3","T8hbqPPro4","T8hbqPPro5","T8hbqPPro6")],na.rm=T); alpha_PPro_12
+alpha_PPro_14 <- alpha(data_wide[,c("T10hbqh18c","T10hbqh18d","T10hbqh18e","T10hbqh18h","T10hbqh18i","T10hbqh18j")],na.rm=T); alpha_PPro_14
+
+##Teacher report
+alpha_TPro_1 <- alpha(data_wide[,c("T1hbqt49","T1hbqt53","T1hbqt56","T1hbqt58","T1hbqt59","T1hbqt60","T1hbqt61")],na.rm=T); alpha_TPro_1
+alpha_TPro_3 <- alpha(data_wide[,c("T3hbqt49","T3hbqt53","T3hbqt56","T3hbqt58","T3hbqt59","T3hbqt60","T3hbqt61")],na.rm=T); alpha_TPro_3
+alpha_TPro_5 <- alpha(data_wide[,c("T5hbqt49","T5hbqt53","T5hbqt56","T5hbqt58","T5hbqt59","T5hbqt60","T5hbqt61")],na.rm=T); alpha_TPro_5
+alpha_TPro_10 <- alpha(data_wide[,c("T6hbqTPro1","T6hbqTPro2","T6hbqTPro3","T6hbqTPro4","T6hbqTPro5","T6hbqTPro6")],na.rm=T); alpha_TPro_10
+alpha_TPro_12 <- alpha(data_wide[,c("T8hbqTPro1","T8hbqTPro2","T8hbqTPro3","T8hbqTPro4","T8hbqTPro5","T8hbqTPro6")],na.rm=T); alpha_TPro_12
+alpha_TPro_14 <- alpha(data_wide[,c("T10hbqt17c","T10hbqt17d","T10hbqt17e","T10hbqt17h","T10hbqt17i","T10hbqt17j")],na.rm=T); alpha_TPro_14
+```
+
+##Bivariate multiwave latent change model for Peer score
+###Using composite parent and teacher-report scores
+```{r BMWLC model for Peer score with composite scores}
 Peer_BMWLC <- '
 #Defining the latent variables
 Peer_1=~1*PPeer1+1*TPeer1
@@ -230,7 +305,7 @@ TPeer10~~TPeer10
 TPeer12~~TPeer12
 TPeer14~~TPeer14
 
-MDDCORE_1~~MDDCORE_1          # This estimates the MDDCORE residual variances
+MDDCORE_1~~2*MDDCORE_1          # This estimates the MDDCORE residual variances
 MDDCORE_3~~MDDCORE_3
 MDDCORE_5~~MDDCORE_5
 MDDCORE_10~~MDDCORE_10
@@ -253,17 +328,17 @@ dMDD_4~MDD_4
 dMDD_5~MDD_5
 
 #Estimate coupling parameter
-dMDD_1~Peer_1         # This estimates the Peer to MDD coupling parameter
-dMDD_2~Peer_2
-dMDD_3~Peer_3
-dMDD_4~Peer_4
-dMDD_5~Peer_5
-
 dPeer_1~MDD_1         # This estimates the MDD to Peer coupling parameter
 dPeer_2~MDD_2
 dPeer_3~MDD_3
 dPeer_4~MDD_4
 dPeer_5~MDD_5
+
+dMDD_1~Peer_1         # This estimates the Peer to MDD coupling parameter
+dMDD_2~Peer_2
+dMDD_3~Peer_3
+dMDD_4~Peer_4
+dMDD_5~Peer_5
 
 iPeer=~1*Peer_1                   # This defines the Peer intercept measurement model
 sPeer=~1*dPeer_1+ 1*dPeer_2+ 1*dPeer_3+ 1*dPeer_4+ 1*dPeer_5 # This defines the Peer slope measurement model
@@ -287,7 +362,7 @@ iPeer~~sMDD                      # This estimates the iPeer sMDD covariance
 sPeer~~sMDD                      # This estimates the sPeer sMDD covariance
 '
 
-fit_Peer_BMWLC <- lavaan(Peer_BMWLC, data=data_wide, missing="FIML")
+fit_Peer_BMWLC <- lavaan(Peer_BMWLC, data=data_wide, missing="FIML", estimator="MLR")
 inspect(fit_Peer_BMWLC,"cor.lv")
 
 summary(fit_Peer_BMWLC, fit.measures=T, standardized=T)
@@ -296,6 +371,7 @@ summary(fit_Peer_BMWLC, fit.measures=T, standardized=T)
 semPaths(fit_Peer_BMWLC, 'mod', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
          label.cex=T, label.scale=T, normalize=F, sizeMan=4, sizeInt=2, sizeLat=3, intercepts=F, residuals=T)
 
+#Figure 2: Model fit to data
 semPaths(fit_Peer_BMWLC, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
          label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
 
@@ -305,10 +381,136 @@ Problematic assumptions: assumes measurement invariance & equal distance between
 Can test measurement invariance for all HBQ measures, but not for the MDD measures.
 Equal distance assumption should be fine since there is only 1 period that is unequal from the rest. Could try running the model from T6 on to see if the results show up the same.
 
+##Bivariate multiwave latent change model for Peer score: No relationship model
+###Using composite parent and teacher-report scores
+```{r BMWLC model for Peer score: No relationship model with composite scores}
+Peer_BMWLC_NR2 <- '
+#Defining the latent variables
+Peer_1=~1*PPeer1+1*TPeer1
+Peer_2=~1*PPeer3+1*TPeer3
+Peer_3=~1*PPeer5+1*TPeer5
+Peer_4=~1*PPeer10+1*TPeer10
+Peer_5=~1*PPeer12+1*TPeer12
+Peer_6=~1*PPeer14+1*TPeer14
 
-Bivariate multiwave latent change model for Peer score: Interpersonal Risk model
-```{r Bivariate multiwave latent change model for Peer score: Interpersonal Risk model}
-PPeer_BMWLC_IR2 <- '
+MDD_1=~1*MDDCORE_1
+MDD_2=~1*MDDCORE_3
+MDD_3=~1*MDDCORE_5
+MDD_4=~1*MDDCORE_10
+MDD_5=~1*MDDCORE_12
+MDD_6=~1*MDDCORE_14
+
+#Define regressions
+Peer_2 ~ 1*Peer_1     # This parameter regresses PPeer3 perfectly on PPeer1
+Peer_3 ~ 1*Peer_2
+Peer_4 ~ 1*Peer_3
+Peer_5 ~ 1*Peer_4
+Peer_6 ~ 1*Peer_5
+
+MDD_2 ~ 1*MDD_1     # This parameter regresses MDD_2 perfectly on MDD_1
+MDD_3 ~ 1*MDD_2
+MDD_4 ~ 1*MDD_3
+MDD_5 ~ 1*MDD_4
+MDD_6 ~ 1*MDD_5
+
+#Define the change score
+dPeer_1 =~ 1*Peer_2        # This defines the change score as measured perfectly by scores on PPeer3
+dPeer_2 =~ 1*Peer_3
+dPeer_3 =~ 1*Peer_4
+dPeer_4 =~ 1*Peer_5
+dPeer_5 =~ 1*Peer_6
+         
+dMDD_1 =~ 1*MDD_2           # This defines the change score as measured perfectly by scores on MDDCORE_3
+dMDD_2 =~ 1*MDD_3           
+dMDD_3 =~ 1*MDD_4
+dMDD_4 =~ 1*MDD_5
+dMDD_5 =~ 1*MDD_6
+
+#Estimate residual variances
+PPeer1~~PPeer1          # This estimates the PPeer residual variances
+PPeer3~~PPeer3
+PPeer5~~PPeer5
+PPeer10~~PPeer10
+PPeer12~~PPeer12
+PPeer14~~PPeer14
+
+TPeer1~~TPeer1          # This estimates the TPeer residual variances
+TPeer3~~TPeer3
+TPeer5~~TPeer5
+TPeer10~~TPeer10
+TPeer12~~TPeer12
+TPeer14~~TPeer14
+
+MDDCORE_1~~MDDCORE_1          # This estimates the MDDCORE residual variances
+MDDCORE_3~~MDDCORE_3
+MDDCORE_5~~MDDCORE_5
+MDDCORE_10~~MDDCORE_10
+MDDCORE_12~~MDDCORE_12
+MDDCORE_14~~MDDCORE_14
+
+#Dynamics
+
+#Estimate the self-feedback parameters
+dPeer_1~F1*Peer_1       # This estimates the Peer self-feedback parameter
+dPeer_2~F1*Peer_2
+dPeer_3~F1*Peer_3
+dPeer_4~F1*Peer_4
+dPeer_5~F1*Peer_5
+
+dMDD_1~F2*MDD_1       # This estimates the MDD self-feedback parameter
+dMDD_2~F2*MDD_2
+dMDD_3~F2*MDD_3
+dMDD_4~F2*MDD_4
+dMDD_5~F2*MDD_5
+
+#Estimate coupling parameter
+dMDD_1~0*Peer_1         # This estimates the Peer to MDD coupling parameter
+dMDD_2~0*Peer_2
+dMDD_3~0*Peer_3
+dMDD_4~0*Peer_4
+dMDD_5~0*Peer_5
+
+dPeer_1~0*MDD_1         # This estimates the MDD to Peer coupling parameter
+dPeer_2~0*MDD_2
+dPeer_3~0*MDD_3
+dPeer_4~0*MDD_4
+dPeer_5~0*MDD_5
+
+iPeer=~1*Peer_1                   # This defines the Peer intercept measurement model
+sPeer=~1*dPeer_1+ 1*dPeer_2+ 1*dPeer_3+ 1*dPeer_4+ 1*dPeer_5 # This defines the Peer slope measurement model
+iPeer~1                             # This estimates the Peer intercept intercept (mean)
+iPeer~~iPeer                         # This estimates the Peer intercept variance
+sPeer~1                             # This estimates the Peer slope intercept
+sPeer~~sPeer                         # This estimates the Peer slope variance
+
+iMDD=~1*MDD_1                   # This defines the MDD intercept measurement model
+sMDD=~1*dMDD_1+ 1*dMDD_2+ 1*dMDD_3+ 1*dMDD_4+ 1*dMDD_5 # This defines the MDD slope measurement model
+iMDD~1                             # This estimates the MDD intercept intercept (mean)
+iMDD~~iMDD                         # This estimates the MDD intercept variance
+sMDD~1                             # This estimates the MDD slope intercept
+sMDD~~sMDD                         # This estimates the MDD slope variance
+
+iMDD~~sMDD                      # This estimates the iMDD sMDD covariance
+iMDD~~sPeer                      # This estimates the iMDD sPeer covariance
+iMDD~~iPeer                      # This estimates the iMDD iPeer covariance
+iPeer~~sPeer                      # This estimates the iPeer sPeer covariance
+iPeer~~sMDD                      # This estimates the iPeer sMDD covariance
+sPeer~~sMDD                      # This estimates the sPeer sMDD covariance
+'
+
+fit_Peer_BMWLC_NR2 <- lavaan(Peer_BMWLC_NR2, data=data_wide, missing="FIML")
+inspect(fit_Peer_BMWLC_IR2,"cor.lv")
+
+summary(fit_Peer_BMWLC_NR2, fit.measures=T, standardized=T)
+
+semPaths(fit_Peer_BMWLC_NR2, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+```
+
+##Bivariate multiwave latent change model for Peer score: Interpersonal Risk model
+###Using composite parent and teacher-report scores
+```{r BMWLC model for Peer score: Interpersonal Risk model with composite scores}
+Peer_BMWLC_IR2 <- '
 #Defining the latent variables
 Peer_1=~1*PPeer1+1*TPeer1
 Peer_2=~1*PPeer3+1*TPeer3
@@ -422,19 +624,19 @@ iPeer~~sMDD                      # This estimates the iPeer sMDD covariance
 sPeer~~sMDD                      # This estimates the sPeer sMDD covariance
 '
 
-fit_PPeer_BMWLC_IR2 <- lavaan(PPeer_BMWLC_IR2, data=data_wide, missing="FIML")
-inspect(fit_PPeer_BMWLC_IR2,"cor.lv")
+fit_Peer_BMWLC_IR2 <- lavaan(Peer_BMWLC_IR2, data=data_wide, missing="FIML")
+inspect(fit_Peer_BMWLC_IR2,"cor.lv")
 
-summary(fit_PPeer_BMWLC_IR2, fit.measures=T, standardized=T)
+summary(fit_Peer_BMWLC_IR2, fit.measures=T, standardized=T)
 
-semPaths(fit_PPeer_BMWLC_IR2, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+semPaths(fit_Peer_BMWLC_IR2, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
          label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
 ```
 
-
-Bivariate multiwave latent change model for Peer score: Interpersonal Scar model
-```{r Bivariate multiwave latent change model for Peer score: Interpersonal Scar model}
-PPeer_BMWLC_IS2 <- '
+##Bivariate multiwave latent change model for Peer score: Interpersonal Scar model
+###Using composite parent and teacher-report scores
+```{r BMWLC model for Peer score: Interpersonal Scar model with composite scores}
+Peer_BMWLC_IS2 <- '
 #Defining the latent variables
 Peer_1=~1*PPeer1+1*TPeer1
 Peer_2=~1*PPeer3+1*TPeer3
@@ -548,22 +750,21 @@ iPeer~~sMDD                      # This estimates the iPeer sMDD covariance
 sPeer~~sMDD                      # This estimates the sPeer sMDD covariance
 '
 
-fit_PPeer_BMWLC_IS2 <- lavaan(PPeer_BMWLC_IS2, data=data_wide, missing="FIML")
-inspect(fit_PPeer_BMWLC_IS2,"cor.lv")
+fit_Peer_BMWLC_IS2 <- lavaan(Peer_BMWLC_IS2, data=data_wide, missing="FIML")
+inspect(fit_Peer_BMWLC_IS2,"cor.lv")
 
-summary(fit_PPeer_BMWLC_IS2, fit.measures=T, standardized=T)
+summary(fit_Peer_BMWLC_IS2, fit.measures=T, standardized=T)
 
-semPaths(fit_PPeer_BMWLC_IS2, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+semPaths(fit_Peer_BMWLC_IS2, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
          label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
 
-lavaanPlot(fit_PPeer_BMWLC_IS2)
+lavaanPlot(fit_Peer_BMWLC_IS2)
 ```
 
-
-
-Bivariate multiwave latent change model for Peer score: Transactional model
-```{r Bivariate multiwave latent change model for Peer score: Transactional model}
-PPeer_BMWLC_T2 <- '
+##Bivariate multiwave latent change model for Peer score: Transactional model
+###Using composite parent and teacher-report scores
+```{r BMWLC model for Peer score: Transactional model with composite scores}
+Peer_BMWLC_T2 <- '
 #Defining the latent variables
 Peer_1=~1*PPeer1+1*TPeer1
 Peer_2=~1*PPeer3+1*TPeer3
@@ -677,27 +878,52 @@ iPeer~~sMDD                      # This estimates the iPeer sMDD covariance
 sPeer~~sMDD                      # This estimates the sPeer sMDD covariance
 '
 
-fit_PPeer_BMWLC_T2 <- lavaan(PPeer_BMWLC_T2, data=data_wide, missing="FIML")
+fit_Peer_BMWLC_T2 <- lavaan(Peer_BMWLC_T2, data=data_wide, missing="FIML", estimator="MLR")
 
-summary(fit_PPeer_BMWLC_T2, fit.measures=T, standardized=T)
+summary(fit_Peer_BMWLC_T2, fit.measures=T, standardized=T)
 
-semPaths(fit_PPeer_BMWLC_T2, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+semPaths(fit_Peer_BMWLC_T2, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
          label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
 ```
 
 
-Bivariate multiwave latent change model for Peer score with parent-report item level observed variables
-```{r Bivariate multiwave latent change model for Peer score with parent-report item level observed variables}
-PPeer_BMWLC_il <- '
+
+
+##Bivariate multiwave latent change model for Peer score with parent-report item level observed variables
+###Using item-level parent-report scores
+```{r BMWLC model for Peer score with parent-report and teacher-report item level scores}
+Peer_BMWLC_il <- '
+#Peer Relations
 #Defining the latent variables
+Peer_1 =~ P1*T1hbq17+Q1*T1hbq18r+R1*T1hbq19r+S1*T1hbq21r+T1*T1hbq22r+U1*T1hbq23r+V1*T1hbq24+W1*T1hbq25r+X1*T1hbq26r+Y1*T1hbq28r+Z1*T1hbq29r+P2*T1hbq17+Q2*T1hbq18r+R2*T1hbq19r+S2*T1hbq21r+T2*T1hbq22r+U2*T1hbq23r+V2*T1hbq24+W2*T1hbq25r+X2*T1hbq26r+Y2*T1hbq28r+Z2*T1hbq29r
 
-Peer_1 =~ 1*T1hbq17+1*T1hbq18r+1*T1hbq19r+1*T1hbq21r+1*T1hbq22r+1*T1hbq23r+1*T1hbq24+1*T1hbq25r+1*T1hbq26r+1*T1hbq28r+1*T1hbq29r
-Peer_2 =~ 1*T3hbq17+1*T3hbq18r+1*T3hbq19r+1*T3hbq21r+1*T3hbq22r+1*T3hbq23r+1*T3hbq24+1*T3hbq26r+1*T3hbq25r+1*T3hbq28r+1*T3hbq29r
-Peer_3 =~ 1*T5hbq17+1*T5hbq18r+1*T5hbq19r+1*T5hbq21r+1*T5hbq22r+1*T5hbq23r+1*T5hbq24+1*T5hbq25r+1*T5hbq26r+1*T5hbq28r+1*T5hbq29r
-Peer_4 =~ 1*T6hbqPPeer1+1*T6hbqPPeer2+1*T6hbqPPeer3+1*T6hbqPPeer4+1*T6hbqPPeer5+1*T6hbqPPeer6+1*T6hbqPPeer7+1*T6hbqPPeer8+1*T6hbqPPeer9+1*T6hbqPPeer10+1*T6hbqPPeer11
-Peer_5 =~ 1*T8hbqPPeer1+1*T8hbqPPeer2+1*T8hbqPPeer3+1*T8hbqPPeer4+1*T8hbqPPeer5+1*T8hbqPPeer6+1*T8hbqPPeer7+1*T8hbqPPeer8+1*T8hbqPPeer9+1*T8hbqPPeer10+1*T8hbqPPeer11
-Peer_6 =~ 1*T10hbqh14a+1*T10hbqh14br+1*T10hbqh14cr+1*T10hbqh14dr+1*T10hbqh14er+1*T10hbqh14fr+1*T10hbqh14g+1*T10hbqh14hr+1*T10hbqh14ir+1*T10hbqh14jr+1*T10hbqh14kr
+Peer_2 =~ P1*T3hbq17+Q1*T3hbq18r+R1*T3hbq19r+S1*T3hbq21r+T1*T3hbq22r+U1*T3hbq23r+V1*T3hbq24+W1*T3hbq26r+X1*T3hbq25r+Y1*T3hbq28r+Z1*T3hbq29r+P2*T3hbqt10+Q2*T3hbqt11r+R2*T3hbqt12r+S2*T3hbqt14r+T2*T3hbqt15r+U2*T3hbqt16r+V2*T3hbqt17+W2*T3hbqt18r+X2*T3hbqt19r+Y2*T3hbqt21r+Z2*T3hbqt22r
 
+Peer_3 =~ P1*T5hbq17+Q1*T5hbq18r+R1*T5hbq19r+S1*T5hbq21r+T1*T5hbq22r+U1*T5hbq23r+V1*T5hbq24+W1*T5hbq25r+X1*T5hbq26r+Y1*T5hbq28r+Z1*T5hbq29r+P2*T5hbqt10+Q2*T5hbqt11r+R2*T5hbqt12r+S2*T5hbqt14r+T2*T5hbqt15r+U2*T5hbqt16r+V2*T5hbqt17+W2*T5hbqt18r+X2*T5hbqt19r+Y2*T5hbqt21r+Z2*T5hbqt22r
+
+Peer_4 =~ P1*T6hbqPPeer1+Q1*T6hbqPPeer2+R1*T6hbqPPeer3+S1*T6hbqPPeer4+T1*T6hbqPPeer5+U1*T6hbqPPeer6+V1*T6hbqPPeer7+W1*T6hbqPPeer8+X1*T6hbqPPeer9+Y1*T6hbqPPeer10+Z1*T6hbqPPeer11+P2*T6hbqTPeer1+Q2*T6hbqTPeer2+R2*T6hbqTPeer3+S2*T6hbqTPeer4+T2*T6hbqTPeer5+U2*T6hbqTPeer6+V2*T6hbqTPeer7+W2*T6hbqTPeer8+X2*T6hbqTPeer9+Y2*T6hbqTPeer10+Z2*T6hbqTPeer11
+
+Peer_5 =~ P1*T8hbqPPeer1+Q1*T8hbqPPeer2+R1*T8hbqPPeer3+S1*T8hbqPPeer4+T1*T8hbqPPeer5+U1*T8hbqPPeer6+V1*T8hbqPPeer7+W1*T8hbqPPeer8+X1*T8hbqPPeer9+Y1*T8hbqPPeer10+Z1*T8hbqPPeer11+P2*T8hbqTPeer1+Q2*T8hbqTPeer2+R2*T8hbqTPeer3+S2*T8hbqTPeer4+T2*T8hbqTPeer5+U2*T8hbqTPeer6+V2*T8hbqTPeer7+W2*T8hbqTPeer8+X2*T8hbqTPeer9+Y2*T8hbqTPeer10+Z2*T8hbqTPeer11
+
+Peer_6 =~ P1*T10hbqh14a+Q1*T10hbqh14br+R1*T10hbqh14cr+S1*T10hbqh14dr+T1*T10hbqh14er+U1*T10hbqh14fr+V1*T10hbqh14g+W1*T10hbqh14hr+X1*T10hbqh14ir+Y1*T10hbqh14jr+Z1*T10hbqh14kr+P2*T10hbqt13a+Q2*T10hbqt13br+R2*T10hbqt13cr+S2*T10hbqt13dr+T2*T10hbqt13er+U2*T10hbqt13fr+V2*T10hbqt13g+W2*T10hbqt13hr+X2*T10hbqt13ir+Y2*T10hbqt13jr+Z2*T10hbqt13kr
+
+#Parent-report Peer Relations
+PPeer_1 =~ P3*T1hbq17+Q3*T1hbq18r+R3*T1hbq19r+S3*T1hbq21r+T3*T1hbq22r+U3*T1hbq23r+V3*T1hbq24+W3*T1hbq25r+X3*T1hbq26r+Y3*T1hbq28r+Z3*T1hbq29r
+PPeer_2 =~ P3*T3hbq17+Q3*T3hbq18r+R3*T3hbq19r+S3*T3hbq21r+T3*T3hbq22r+U3*T3hbq23r+V3*T3hbq24+W3*T3hbq26r+X3*T3hbq25r+Y3*T3hbq28r+Z3*T3hbq29r
+PPeer_3 =~ P3*T5hbq17+Q3*T5hbq18r+R3*T5hbq19r+S3*T5hbq21r+T3*T5hbq22r+U3*T5hbq23r+V3*T5hbq24+W3*T5hbq25r+X3*T5hbq26r+Y3*T5hbq28r+Z3*T5hbq29r
+PPeer_4 =~ P3*T6hbqPPeer1+Q3*T6hbqPPeer2+R3*T6hbqPPeer3+S3*T6hbqPPeer4+T3*T6hbqPPeer5+U3*T6hbqPPeer6+V3*T6hbqPPeer7+W3*T6hbqPPeer8+X3*T6hbqPPeer9+Y3*T6hbqPPeer10+Z3*T6hbqPPeer11
+PPeer_5 =~ P3*T8hbqPPeer1+Q3*T8hbqPPeer2+R3*T8hbqPPeer3+S3*T8hbqPPeer4+T3*T8hbqPPeer5+U3*T8hbqPPeer6+V3*T8hbqPPeer7+W3*T8hbqPPeer8+X3*T8hbqPPeer9+Y3*T8hbqPPeer10+Z3*T8hbqPPeer11
+PPeer_6 =~ P3*T10hbqh14a+Q3*T10hbqh14br+R3*T10hbqh14cr+S3*T10hbqh14dr+T3*T10hbqh14er+U3*T10hbqh14fr+V3*T10hbqh14g+W3*T10hbqh14hr+X3*T10hbqh14ir+Y3*T10hbqh14jr+Z3*T10hbqh14kr
+
+#Teacher-report Peer Relations
+TPeer_1 =~ P4*T1hbqt10+Q4*T1hbqt11r+R4*T1hbqt12r+S4*T1hbqt14r+T4*T1hbqt15r+U4*T1hbqt16r+V4*T1hbqt17+W4*T1hbqt18r+X4*T1hbqt19r+Y4*T1hbqt21r+Z4*T1hbqt22r
+TPeer_2 =~ P4*T3hbqt10+Q4*T3hbqt11r+R4*T3hbqt12r+S4*T3hbqt14r+T4*T3hbqt15r+U4*T3hbqt16r+V4*T3hbqt17+W4*T3hbqt18r+X4*T3hbqt19r+Y4*T3hbqt21r+Z4*T3hbqt22r
+TPeer_3 =~ P4*T5hbqt10+Q4*T5hbqt11r+R4*T5hbqt12r+S4*T5hbqt14r+T4*T5hbqt15r+U4*T5hbqt16r+V4*T5hbqt17+W4*T5hbqt18r+X4*T5hbqt19r+Y4*T5hbqt21r+Z4*T5hbqt22r
+TPeer_4 =~ P4*T6hbqTPeer1+Q4*T6hbqTPeer2+R4*T6hbqTPeer3+S4*T6hbqTPeer4+T4*T6hbqTPeer5+U4*T6hbqTPeer6+V4*T6hbqTPeer7+W4*T6hbqTPeer8+X4*T6hbqTPeer9+Y4*T6hbqTPeer10+Z4*T6hbqTPeer11
+TPeer_5 =~ P4*T8hbqTPeer1+Q4*T8hbqTPeer2+R4*T8hbqTPeer3+S4*T8hbqTPeer4+T4*T8hbqTPeer5+U4*T8hbqTPeer6+V4*T8hbqTPeer7+W4*T8hbqTPeer8+X4*T8hbqTPeer9+Y4*T8hbqTPeer10+Z4*T8hbqTPeer11
+TPeer_6 =~ P4*T10hbqt13a+Q4*T10hbqt13br+R4*T10hbqt13cr+S4*T10hbqt13dr+T4*T10hbqt13er+U4*T10hbqt13fr+V4*T10hbqt13g+W4*T10hbqt13hr+X4*T10hbqt13ir+Y4*T10hbqt13jr+Z4*T10hbqt13kr
+
+#Depression
 MDD_1 =~ 1*MDDCORE_1
 MDD_2 =~ 1*MDDCORE_3
 MDD_3 =~ 1*MDDCORE_5
@@ -821,6 +1047,96 @@ T6hbqPPeer11 ~~ T6hbqPPeer11
 T8hbqPPeer11 ~~ T8hbqPPeer11
 T10hbqh14kr ~~ T10hbqh14kr
 
+##Teacher-report
+###Item 1
+T1hbqt10 ~~ T1hbqt10
+T3hbqt10 ~~ T3hbqt10
+T5hbqt10 ~~ T5hbqt10
+T6hbqTPeer1 ~~ T6hbqTPeer1
+T8hbqTPeer1 ~~ T8hbqTPeer1
+T10hbqt13a ~~ T10hbqt13a
+
+###Item 2
+T1hbqt11r ~~ T1hbqt11r
+T3hbqt11r ~~ T3hbqt11r
+T5hbqt11r ~~ T5hbqt11r
+T6hbqTPeer2 ~~ T6hbqTPeer2
+T8hbqTPeer2 ~~ T8hbqTPeer2
+T10hbqt13br ~~ T10hbqt13br
+
+###Item 3
+T1hbqt12r ~~ T1hbqt12r
+T3hbqt12r ~~ T3hbqt12r
+T5hbqt12r ~~ T5hbqt12r
+T6hbqTPeer3 ~~ T6hbqTPeer3
+T8hbqTPeer3 ~~ T8hbqTPeer3
+T10hbqt13cr ~~ T10hbqt13cr
+
+###Item 4
+T1hbqt14r ~~ T1hbqt14r
+T3hbqt14r ~~ T3hbqt14r
+T5hbqt14r ~~ T5hbqt14r
+T6hbqTPeer4 ~~ T6hbqTPeer4
+T8hbqTPeer4 ~~ T8hbqTPeer4
+T10hbqt13dr ~~ T10hbqt13dr
+
+###Item 5
+T1hbqt15r ~~ T1hbqt15r
+T3hbqt15r ~~ T3hbqt15r
+T5hbqt15r ~~ T5hbqt15r
+T6hbqTPeer5 ~~ T6hbqTPeer5
+T8hbqTPeer5 ~~ T8hbqTPeer5
+T10hbqt13er ~~ T10hbqt13er
+
+###Item 6
+T1hbqt16r ~~ T1hbqt16r
+T3hbqt16r ~~ T3hbqt16r
+T5hbqt16r ~~ T5hbqt16r
+T6hbqTPeer6 ~~ T6hbqTPeer6
+T8hbqTPeer6 ~~ T8hbqTPeer6
+T10hbqt13fr ~~ T10hbqt13fr
+
+###Item 7
+T1hbqt17 ~~ T1hbqt17
+T3hbqt17 ~~ T3hbqt17
+T5hbqt17 ~~ T5hbqt17
+T6hbqTPeer7 ~~ T6hbqTPeer7
+T8hbqTPeer7 ~~ T8hbqTPeer7
+T10hbqt13g ~~ T10hbqt13g
+
+###Item 8
+T1hbqt18r ~~ T1hbqt18r
+T3hbqt18r ~~ T3hbqt18r
+T5hbqt18r ~~ T5hbqt18r
+T6hbqTPeer8 ~~ T6hbqTPeer8
+T8hbqTPeer8 ~~ T8hbqTPeer8
+T10hbqt13hr ~~ T10hbqt13hr
+
+###Item 9
+T1hbqt19r ~~ T1hbqt19r
+T3hbqt19r ~~ T3hbqt19r
+T5hbqt19r ~~ T5hbqt19r
+T6hbqTPeer9 ~~ T6hbqTPeer9
+T8hbqTPeer9 ~~ T8hbqTPeer9
+T10hbqt13ir ~~ T10hbqt13ir
+
+###Item 10
+T1hbqt21r ~~ T1hbqt21r
+T3hbqt21r ~~ T3hbqt21r
+T5hbqt21r ~~ T5hbqt21r
+T6hbqTPeer10 ~~ T6hbqTPeer10
+T8hbqTPeer10 ~~ T8hbqTPeer10
+T10hbqt13jr ~~ T10hbqt13jr
+
+###Item 11
+T1hbqt22r ~~ T1hbqt22r
+T3hbqt22r ~~ T3hbqt22r
+T5hbqt22r ~~ T5hbqt22r
+T6hbqTPeer11 ~~ T6hbqTPeer11
+T8hbqTPeer11 ~~ T8hbqTPeer11
+T10hbqt13kr ~~ T10hbqt13kr
+
+
 MDDCORE_1 ~~ MDDCORE_1          # This estimates the MDDCORE residual variances
 MDDCORE_3 ~~ MDDCORE_3
 MDDCORE_5 ~~ MDDCORE_5
@@ -878,18 +1194,18 @@ iPeer~~sMDD                      # This estimates the iPeer sMDD covariance
 sPeer~~sMDD                      # This estimates the sPeer sMDD covariance
 '
 
-fit_PPeer_BMWLC_il <- lavaan(PPeer_BMWLC_il, data=data_wide, missing="FIML",
+fit_Peer_BMWLC_il <- lavaan(Peer_BMWLC_il, data=data_wide, missing="FIML",estimator="MLR",
                             control=list(eval.max=40000, iter.min=10000))
 
-summary(fit_PPeer_BMWLC_il, fit.measures=T, standardized=T)
+summary(fit_Peer_BMWLC_il, fit.measures=T, standardized=T)
 
-semPaths(fit_PPeer_BMWLC_il, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+semPaths(fit_Peer_BMWLC_il, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
          label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
 ```
 
-
-Bivariate multiwave latent change model for Peer score for Interpersonal Risk model
-```{r Bivariate multiwave latent change model for Peer score for Interpersonal Risk model}
+##Bivariate multiwave latent change model for Peer score: Interpersonal Risk model
+###Using item-level parent-report scores
+```{r BMWLC model for Peer score: Interpersonal Risk model with parent-report item level scores}
 PPeer_BMWLC_IR <- '
 #Defining the latent variables
 
@@ -1091,9 +1407,9 @@ semPaths(fit_PPeer_BMWLC_IR, 'std', 'est', curveAdjacent=T, layout="tree", ortho
 IR_fit <- fitMeasures(fit_PPeer_BMWLC_IR, c("chisq","df","rmsea"))
 ```
 
-
-Bivariate multiwave latent change model for Peer score for Interpersonal Scar model
-```{r Bivariate multiwave latent change model for Peer score for Interpersonal Scar model}
+##Bivariate multiwave latent change model for Peer score: Interpersonal Scar model
+###Using item-level parent-report scores
+```{r BMWLC model for Peer score: Interpersonal Scar model with parent-report item level scores}
 PPeer_BMWLC_IS <- '
 #Defining the latent variables
 
@@ -1296,9 +1612,9 @@ IS_fit <- fitMeasures(fit_PPeer_BMWLC_IS, c("chisq","df","rmsea"))
 IS_fit[1]/(IS_fit[2]*(IR_fit[3]-IS_fit[3]))
 ```
 
-
-Bivariate multiwave latent change model for Peer score for Transactional model
-```{r Bivariate multiwave latent change model for Peer score for Transactional model}
+##Bivariate multiwave latent change model for Peer score: Transactional model
+###Using item-level parent-report scores
+```{r BMWLC model for Peer score: Transactional model with parent-report item level scores}
 PPeer_BMWLC_T <- '
 #Defining the latent variables
 
@@ -1516,6 +1832,14 @@ latent <- paths %>%
   distinct %>%
   mutate(shape = "circle")
 
+latent <- paths %>%
+  filter(op == "=~") %>%
+  create_node_df(nodes = lhs,
+               label = FALSE,
+               type = "type_1",
+               shape = "circle",
+               data = est)
+
 # This is a node data-frame now
 latent
 
@@ -1530,8 +1854,8 @@ manifest <- paths %>%
 
 # Nodes are prepared
 node_set <- combine_ndfs(latent, manifest)
-node_set[,3] <- "type_1"
-colnames(node_set[3]) <- "type"
+#node_set[,3] <- "type_1"
+#colnames(node_set[3]) <- "type"
 
 # Edges will be labeled by the parameter estimates
 all_paths <- paths %>%
@@ -1556,13 +1880,12 @@ regressions <- all_paths %>%
   select(edge_from, edge_to, style, label)
 
 edge_set <- combine_edfs(loadings, regressions)
-#edge_set <- edge_set[,-5]
 
 # What's missing? Covariance/variance (~~) and intercept (~1) paths
 
 # Combine edges and nodes
-my_graph <- create_graph(
-  node_set,edge_set)
+my_graph <- create_graph()
+my_graph <- create_graph(node_set,edge_set)
   
 
 
