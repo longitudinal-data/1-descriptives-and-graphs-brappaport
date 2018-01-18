@@ -246,143 +246,7 @@ alpha_TPro_14 <- alpha(data_wide[,c("T10hbqt17c","T10hbqt17d","T10hbqt17e","T10h
 ```
 
 #Explanation of models
-5 main models: First, a baseline model where coupling parameters are fixed to 0. Second, an “interpersonal risk” model where coupling coefficients from dMDD ~ Peer (change in MDD symptoms predicted by Peer relations) are non-zero but are fixed across time. Third, an "interpersonal scar" model where coupling coefficients from dPeer ~ MDD (change in Peer relations predicted by MDD) are non-zero but are fixed across time. Fourth, a "transactional" model where coupling cofficients from Peer to dMDD and MDD to dPeer are non-zero but fixed across time. Fifth, a model where all coupling parameters (dPeer ~ MDD and dMDD ~ Peer) are free to vary over time. 
-
-##Bivariate multiwave latent change model for Peer score
-###Using composite parent and teacher-report scores
-```{r BMWLC model for Peer score with composite scores}
-Peer_BMWLC <- '
-#Defining the latent variables
-Peer_1=~1*PPeer1+1*TPeer1
-Peer_2=~1*PPeer3+1*TPeer3
-Peer_3=~1*PPeer5+1*TPeer5
-Peer_4=~1*PPeer10+1*TPeer10
-Peer_5=~1*PPeer12+1*TPeer12
-Peer_6=~1*PPeer14+1*TPeer14
-
-MDD_1=~1*MDDCORE_1
-MDD_2=~1*MDDCORE_3
-MDD_3=~1*MDDCORE_5
-MDD_4=~1*MDDCORE_10
-MDD_5=~1*MDDCORE_12
-MDD_6=~1*MDDCORE_14
-
-#Define regressions
-Peer_2 ~ 1*Peer_1
-Peer_3 ~ 1*Peer_2
-Peer_4 ~ 1*Peer_3
-Peer_5 ~ 1*Peer_4
-Peer_6 ~ 1*Peer_5
-
-MDD_2 ~ 1*MDD_1
-MDD_3 ~ 1*MDD_2
-MDD_4 ~ 1*MDD_3
-MDD_5 ~ 1*MDD_4
-MDD_6 ~ 1*MDD_5
-
-#Define the change score
-dPeer_1 =~ 1*Peer_2
-dPeer_2 =~ 1*Peer_3
-dPeer_3 =~ 1*Peer_4
-dPeer_4 =~ 1*Peer_5
-dPeer_5 =~ 1*Peer_6
-         
-dMDD_1 =~ 1*MDD_2
-dMDD_2 =~ 1*MDD_3           
-dMDD_3 =~ 1*MDD_4
-dMDD_4 =~ 1*MDD_5
-dMDD_5 =~ 1*MDD_6
-
-#Estimate residual variances
-PPeer1~~PPeer1          # This estimates the PPeer residual variances
-PPeer3~~PPeer3
-PPeer5~~PPeer5
-PPeer10~~PPeer10
-PPeer12~~PPeer12
-PPeer14~~PPeer14
-
-TPeer1~~TPeer1          # This estimates the TPeer residual variances
-TPeer3~~TPeer3
-TPeer5~~TPeer5
-TPeer10~~TPeer10
-TPeer12~~TPeer12
-TPeer14~~TPeer14
-
-MDDCORE_1~~2*MDDCORE_1          # This estimates the MDDCORE residual variances
-MDDCORE_3~~MDDCORE_3
-MDDCORE_5~~MDDCORE_5
-MDDCORE_10~~MDDCORE_10
-MDDCORE_12~~MDDCORE_12
-MDDCORE_14~~MDDCORE_14
-
-#Dynamics
-
-#Estimate the self-feedback parameters
-dPeer_1~Peer_1       # This estimates the Peer self-feedback parameter
-dPeer_2~Peer_2
-dPeer_3~Peer_3
-dPeer_4~Peer_4
-dPeer_5~Peer_5
-
-dMDD_1~MDD_1       # This estimates the MDD self-feedback parameter
-dMDD_2~MDD_2
-dMDD_3~MDD_3
-dMDD_4~MDD_4
-dMDD_5~MDD_5
-
-#Estimate coupling parameter
-dPeer_1~MDD_1         # This estimates the MDD to Peer coupling parameter
-dPeer_2~MDD_2
-dPeer_3~MDD_3
-dPeer_4~MDD_4
-dPeer_5~MDD_5
-
-dMDD_1~Peer_1         # This estimates the Peer to MDD coupling parameter
-dMDD_2~Peer_2
-dMDD_3~Peer_3
-dMDD_4~Peer_4
-dMDD_5~Peer_5
-
-iPeer=~1*Peer_1                   # This defines the Peer intercept measurement model
-sPeer=~1*dPeer_1+ 1*dPeer_2+ 1*dPeer_3+ 1*dPeer_4+ 1*dPeer_5 # This defines the Peer slope measurement model
-iPeer~1                             # This estimates the Peer intercept intercept (mean)
-iPeer~~iPeer                         # This estimates the Peer intercept variance
-sPeer~1                             # This estimates the Peer slope intercept
-sPeer~~sPeer                         # This estimates the Peer slope variance
-
-iMDD=~1*MDD_1                   # This defines the MDD intercept measurement model
-sMDD=~1*dMDD_1+ 1*dMDD_2+ 1*dMDD_3+ 1*dMDD_4+ 1*dMDD_5 # This defines the MDD slope measurement model
-iMDD~1                             # This estimates the MDD intercept intercept (mean)
-iMDD~~iMDD                         # This estimates the MDD intercept variance
-sMDD~1                             # This estimates the MDD slope intercept
-sMDD~~sMDD                         # This estimates the MDD slope variance
-
-iMDD~~sMDD                      # This estimates the iMDD sMDD covariance
-iMDD~~sPeer                      # This estimates the iMDD sPeer covariance
-iMDD~~iPeer                      # This estimates the iMDD iPeer covariance
-iPeer~~sPeer                      # This estimates the iPeer sPeer covariance
-iPeer~~sMDD                      # This estimates the iPeer sMDD covariance
-sPeer~~sMDD                      # This estimates the sPeer sMDD covariance
-'
-
-fit_Peer_BMWLC <- lavaan(Peer_BMWLC, data=data_wide, missing="FIML", estimator="MLR")
-inspect(fit_Peer_BMWLC,"cor.lv")
-
-summary(fit_Peer_BMWLC, fit.measures=T, standardized=T)
-
-#Figure 1: Theoretical model
-semPaths(fit_Peer_BMWLC, 'mod', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
-         label.cex=T, label.scale=T, normalize=F, sizeMan=4, sizeInt=2, sizeLat=3, intercepts=F, residuals=T)
-
-#Figure 2: Model fit to data
-semPaths(fit_Peer_BMWLC, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
-         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
-
-fit_Peer_BMWLC_sf_c_parameters <- parameterEstimates(fit_Peer_BMWLC)[57:76,]
-```
-Problematic assumptions: assumes measurement invariance & equal distance between assessments (which is true for the most part)
-Can test measurement invariance for all HBQ measures, but not for the MDD measures.
-Equal distance assumption should be fine since there is only 1 period that is unequal from the rest. Could try running the model from T6 on to see if the results show up the same.
+5 main models: First, a baseline model where coupling parameters are fixed to 0. Second, an “interpersonal risk” model where coupling coefficients from dMDD ~ Peer (change in MDD symptoms predicted by Peer relations) are non-zero but are fixed across time. Third, an "interpersonal scar" model where coupling coefficients from dPeer ~ MDD (change in Peer relations predicted by MDD) are non-zero but are fixed across time. Fourth, a "transactional" model where coupling cofficients from Peer to dMDD and MDD to dPeer are non-zero but fixed across time. Fifth, a model where all coupling parameters (dPeer ~ MDD and dMDD ~ Peer) are free to vary over time, used to detect developmental changes in the relationship between Peer relations and MDD symptoms.
 
 ##Bivariate multiwave latent change model for Peer score: No relationship model
 ###Using composite parent and teacher-report scores
@@ -502,7 +366,6 @@ sPeer~~sMDD                      # This estimates the sPeer sMDD covariance
 '
 
 fit_Peer_BMWLC_NR2 <- lavaan(Peer_BMWLC_NR2, data=data_wide, missing="FIML", estimator="MLR")
-inspect(fit_Peer_BMWLC_IR2,"cor.lv")
 
 summary(fit_Peer_BMWLC_NR2, fit.measures=T, standardized=T)
 
@@ -889,6 +752,141 @@ semPaths(fit_Peer_BMWLC_T2, 'std', 'est', curveAdjacent=T, layout="tree", orthog
          label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
 ```
 
+##Bivariate multiwave latent change model for Peer score
+###Using composite parent and teacher-report scores
+```{r BMWLC model for Peer score with composite scores}
+Peer_BMWLC <- '
+#Defining the latent variables
+Peer_1=~1*PPeer1+1*TPeer1
+Peer_2=~1*PPeer3+1*TPeer3
+Peer_3=~1*PPeer5+1*TPeer5
+Peer_4=~1*PPeer10+1*TPeer10
+Peer_5=~1*PPeer12+1*TPeer12
+Peer_6=~1*PPeer14+1*TPeer14
+
+MDD_1=~1*MDDCORE_1
+MDD_2=~1*MDDCORE_3
+MDD_3=~1*MDDCORE_5
+MDD_4=~1*MDDCORE_10
+MDD_5=~1*MDDCORE_12
+MDD_6=~1*MDDCORE_14
+
+#Define regressions
+Peer_2 ~ 1*Peer_1
+Peer_3 ~ 1*Peer_2
+Peer_4 ~ 1*Peer_3
+Peer_5 ~ 1*Peer_4
+Peer_6 ~ 1*Peer_5
+
+MDD_2 ~ 1*MDD_1
+MDD_3 ~ 1*MDD_2
+MDD_4 ~ 1*MDD_3
+MDD_5 ~ 1*MDD_4
+MDD_6 ~ 1*MDD_5
+
+#Define the change score
+dPeer_1 =~ 1*Peer_2
+dPeer_2 =~ 1*Peer_3
+dPeer_3 =~ 1*Peer_4
+dPeer_4 =~ 1*Peer_5
+dPeer_5 =~ 1*Peer_6
+         
+dMDD_1 =~ 1*MDD_2
+dMDD_2 =~ 1*MDD_3           
+dMDD_3 =~ 1*MDD_4
+dMDD_4 =~ 1*MDD_5
+dMDD_5 =~ 1*MDD_6
+
+#Estimate residual variances
+PPeer1~~PPeer1          # This estimates the PPeer residual variances
+PPeer3~~PPeer3
+PPeer5~~PPeer5
+PPeer10~~PPeer10
+PPeer12~~PPeer12
+PPeer14~~PPeer14
+
+TPeer1~~TPeer1          # This estimates the TPeer residual variances
+TPeer3~~TPeer3
+TPeer5~~TPeer5
+TPeer10~~TPeer10
+TPeer12~~TPeer12
+TPeer14~~TPeer14
+
+MDDCORE_1~~2*MDDCORE_1          # This estimates the MDDCORE residual variances
+MDDCORE_3~~MDDCORE_3
+MDDCORE_5~~MDDCORE_5
+MDDCORE_10~~MDDCORE_10
+MDDCORE_12~~MDDCORE_12
+MDDCORE_14~~MDDCORE_14
+
+#Dynamics
+
+#Estimate the self-feedback parameters
+dPeer_1~Peer_1       # This estimates the Peer self-feedback parameter
+dPeer_2~Peer_2
+dPeer_3~Peer_3
+dPeer_4~Peer_4
+dPeer_5~Peer_5
+
+dMDD_1~MDD_1       # This estimates the MDD self-feedback parameter
+dMDD_2~MDD_2
+dMDD_3~MDD_3
+dMDD_4~MDD_4
+dMDD_5~MDD_5
+
+#Estimate coupling parameter
+dPeer_1~MDD_1         # This estimates the MDD to Peer coupling parameter
+dPeer_2~MDD_2
+dPeer_3~MDD_3
+dPeer_4~MDD_4
+dPeer_5~MDD_5
+
+dMDD_1~Peer_1         # This estimates the Peer to MDD coupling parameter
+dMDD_2~Peer_2
+dMDD_3~Peer_3
+dMDD_4~Peer_4
+dMDD_5~Peer_5
+
+iPeer=~1*Peer_1                   # This defines the Peer intercept measurement model
+sPeer=~1*dPeer_1+ 1*dPeer_2+ 1*dPeer_3+ 1*dPeer_4+ 1*dPeer_5 # This defines the Peer slope measurement model
+iPeer~1                             # This estimates the Peer intercept intercept (mean)
+iPeer~~iPeer                         # This estimates the Peer intercept variance
+sPeer~1                             # This estimates the Peer slope intercept
+sPeer~~sPeer                         # This estimates the Peer slope variance
+
+iMDD=~1*MDD_1                   # This defines the MDD intercept measurement model
+sMDD=~1*dMDD_1+ 1*dMDD_2+ 1*dMDD_3+ 1*dMDD_4+ 1*dMDD_5 # This defines the MDD slope measurement model
+iMDD~1                             # This estimates the MDD intercept intercept (mean)
+iMDD~~iMDD                         # This estimates the MDD intercept variance
+sMDD~1                             # This estimates the MDD slope intercept
+sMDD~~sMDD                         # This estimates the MDD slope variance
+
+iMDD~~sMDD                      # This estimates the iMDD sMDD covariance
+iMDD~~sPeer                      # This estimates the iMDD sPeer covariance
+iMDD~~iPeer                      # This estimates the iMDD iPeer covariance
+iPeer~~sPeer                      # This estimates the iPeer sPeer covariance
+iPeer~~sMDD                      # This estimates the iPeer sMDD covariance
+sPeer~~sMDD                      # This estimates the sPeer sMDD covariance
+'
+
+fit_Peer_BMWLC <- lavaan(Peer_BMWLC, data=data_wide, missing="FIML", estimator="MLR")
+inspect(fit_Peer_BMWLC,"cor.lv")
+
+summary(fit_Peer_BMWLC, fit.measures=T, standardized=T)
+
+#Figure 1: Theoretical model
+semPaths(fit_Peer_BMWLC, 'mod', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=4, sizeInt=2, sizeLat=3, intercepts=F, residuals=T)
+
+#Figure 2: Model fit to data
+semPaths(fit_Peer_BMWLC, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+
+fit_Peer_BMWLC_sf_c_parameters <- parameterEstimates(fit_Peer_BMWLC)[57:76,]
+```
+Problematic assumptions: assumes measurement invariance & equal distance between assessments (which is true for the most part)
+Can test measurement invariance for all HBQ measures, but not for the MDD measures.
+Equal distance assumption should be fine since there is only 1 period that is unequal from the rest. Could try running the model from T6 on to see if the results show up the same.
 
 
 
