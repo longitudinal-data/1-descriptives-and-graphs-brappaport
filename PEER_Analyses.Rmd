@@ -1,0 +1,2429 @@
+---
+title: "Final Analyses"
+author: "Brent Rappaport"
+date: "01/18/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo= TRUE, warning= FALSE, cache= TRUE)
+library(ggplot2)
+library(psych)
+library(knitr)
+library(Rmisc)
+library(tidyverse)
+library(car)
+library(lsr)
+library(lsmeans)
+library(R.utils)
+library(descr)
+library(lme4)
+library(nnet)
+library(mnlogit)
+library(foreign)
+library(broom)
+library(parallel)
+library(lmerTest)
+library(semPlot)
+library(lavaan) ##need this to run the analyses
+library(ggthemes) ##to help make graphs
+library(ggrepel) ##to help make graphs
+library(papaja)
+library(lavaanPlot)
+library(DiagrammeR)
+
+data_wide <- read.csv("/Users/BrentRappaport/Box Sync/WashU/Classes/Longtudinal Methods/1-descriptives-and-graphs-brappaport/Rappaport_data.csv")
+data_wide <- data_wide[,-1]
+```
+
+```{r Convert data to long form, eval=F}
+#Convert data to long form
+data_long <- data_wide[,c(1:2,7190:7229)]
+data_long <- data_wide %>% 
+  gather(c("age_1","age_3","age_5","age_10","age_12","age_14","age_16","age_18",
+           "PPeer_1","PPeer_3","PPeer_5","PPeer_10","PPeer_12","PPeer_14","PPeer_16","PPeer_18",
+           "TPeer_1","TPeer_3","TPeer_5","TPeer_10","TPeer_12","TPeer_14","TPeer_16","TPeer_18",
+           "MDDCORE_1","MDDCORE_3","MDDCORE_5","MDDCORE_10","MDDCORE_12","MDDCORE_14","MDDCORE_16","MDDCORE_18",
+           "MDDPRP_1","MDDPRP_3","MDDPRP_5","MDDPRP_10","MDDPRP_12","MDDPRP_14","MDDPRP_16","MDDPRP_18",
+           "INTL_1","INTL_3","INTL_5","INTL_10","INTL_12","INTL_14","INTL_16","INTL_18",
+           "EXTL_1","EXTL_3","EXTL_5","EXTL_10","EXTL_12","EXTL_14","EXTL_16","EXTL_18"), 
+         key = "time", value = "value") %>% 
+  separate(time, into = c("variable", "wave")) %>%
+  spread(variable,value)
+
+data_long$wave <- as.integer(data_long$wave)
+
+#sort by id
+data_long <- data_long[order(data_long$ID),] 
+```
+
+
+Descriptive statistics
+```{r Descriptive statistics}
+#Descriptive stats of the same variables over time
+Peer_descriptives <- describe(data_wide[,c("PPeer_1","PPeer_3","PPeer_5","PPeer_10","PPeer_12",
+                       "PPeer_14")])[1:4]
+Peer_descriptives[,5:7] <- describe(data_wide[,c("TPeer_1","TPeer_3","TPeer_5","TPeer_10","TPeer_12",
+                       "TPeer_14")])[2:4]
+Peer_descriptives[,8:10] <- describe(data_wide[,c("MDDCORE_1","MDDCORE_3","MDDCORE_5","MDDCORE_10",
+                                                 "MDDCORE_12","MDDCORE_14",
+                                                 "MDDCORE_16","MDDCORE_18")])[2:4]
+Peer_descriptives[,11:13] <- describe(data_wide[,c("MDDPRP_1","MDDPRP_3","MDDPRP_5","MDDPRP_10",
+                                                 "MDDPRP_12","MDDPRP_14",
+                                                 "MDDPRP_16","MDDPRP_18")])[2:4]
+Peer_descriptives[,1] <- describe(data_wide[,c("age_1","age_3","age_5","age_10","age_12",
+                       "age_14")])[3]
+
+colnames(Peer_descriptives) <- c("Age","Parent-report N","Parent-report Mean","Parent-report SD",
+                                 "Teacher-report N","Teacher-report Mean","Teacher-report SD",
+                                 "MDD Core Symptoms N","MDD Core Symptoms Mean","MDD Core Symptoms SD",
+                                 "MDD Prop Symptoms N","MDD Prop Symptoms Mean","MDD Prop Symptoms SD")
+
+Peer_descriptives
+
+#Relationship betweem MDDCORE_ and MDDPRP_
+cor(data_wide[,c("MDDCORE_1","MDDCORE_3","MDDCORE_5","MDDCORE_10","MDDCORE_12","MDDCORE_14")],
+    data_wide[,c("MDDPRP_1","MDDPRP_3","MDDPRP_5","MDDPRP_10","MDDPRP_12","MDDPRP_14")],
+    method= "pearson", use="complete.obs")
+
+#Relationship of Parent and Teacher report on the Peer scale over time
+cor(data_wide[,c("PPeer_1","PPeer_3","PPeer_5","PPeer_10","PPeer_12","PPeer_14","PPeer_16","PPeer_18")],
+    data_wide[,c("TPeer_1","TPeer_3","TPeer_5","TPeer_10","TPeer_12","TPeer_14","TPeer_16","TPeer_18")],
+    method="pearson", use="pairwise.complete.obs")
+```
+
+Individual Trajectories
+```{r Individual trajectories}
+ggplot(data_long,aes(age,PPeer,group=ID)) +
+  geom_line(alpha=.5) +
+  stat_smooth(aes(group=1),method="lm",size=1,se=T,linetype="longdash") + 
+  labs(x="Age",y="Parent-report Peer Scale Score") +
+  theme(text=element_text(lineheight=1, face="bold", size=15), 
+        legend.position="none")
+
+ggplot(data_long,aes(age,PPeer,group=ID,color=factor(sex))) +
+  geom_line(alpha=.25) +
+  scale_color_manual(values=c("#377EB8","#E41A1C"),
+                     name ="Sex", breaks=c(1,2),
+                         labels=c("Male","Female")) +
+  stat_smooth(aes(group=factor(sex)),method="lm",size=1,se=T,linetype="longdash",
+              formula=y~x+I(x^2),size=1) +
+  labs(x="Age",y="Parent-report Peer Scale Score") +
+  theme(text=element_text(lineheight=1, face="bold", size=15), 
+        legend.position="right")
+
+ggplot(data_long,aes(age,MDDCORE,group=ID)) +
+  geom_line(alpha=.5) +
+  stat_smooth(aes(group=1),method="lm",size=1,se=T,linetype="longdash") + 
+  labs(x="Age",y="MDD Core Symptoms") +
+  theme(text=element_text(lineheight=1, face="bold", size=15), 
+        legend.position="none")
+
+ggplot(data_long,aes(age,MDDCORE,group=ID,color=factor(sex))) +
+  geom_line(alpha=.5) +
+  stat_smooth(aes(group=factor(sex)),method="lm",size=1,se=T,linetype="longdash") + 
+  labs(x="Age",y="MDD Core Symptoms") +
+  theme(text=element_text(lineheight=1, face="bold", size=15), 
+        legend.position="none")
+
+ggplot(data_long,aes(age,INTL,group=ID)) +
+  geom_line(alpha=.5) +
+  stat_smooth(aes(group=1),method="lm",size=1,se=T,linetype="longdash") + 
+  labs(x="Age",y="Proportion of MDD Symptoms") +
+  theme(text=element_text(lineheight=1, face="bold", size=15), 
+        legend.position="none")
+```
+
+#Histograms
+```{r Histograms}
+hist(data_wide$PPeer_1+data_wide$TPeer1, breaks = c(seq(2,8,.1)))
+hist(data_wide$PPeer_3+data_wide$TPeer3, breaks = c(seq(2,8,.1)))
+hist(data_wide$PPeer_5+data_wide$TPeer5, breaks = c(seq(2,8,.1)))
+hist(data_wide$PPeer_10+data_wide$TPeer10, breaks = c(seq(2,8,.1)))
+hist(data_wide$PPeer_12+data_wide$TPeer12, breaks = c(seq(2,8,.1)))
+hist(data_wide$PPeer_14+data_wide$TPeer14, breaks = c(seq(2,8,.1)))
+```
+
+#Internal consistency
+```{r Internal consistency}
+#Peer
+##Parent report
+alpha_PPeer_1 <- alpha(data_wide[,c("T1hbq17","T1hbq18r","T1hbq19r","T1hbq21r","T1hbq22r","T1hbq23r","T1hbq24","T1hbq25r","T1hbq26r","T1hbq28r","T1hbq29r")],na.rm=T); alpha_PPeer_1
+alpha_PPeer_3 <- alpha(data_wide[,c("T3hbq17","T3hbq18r","T3hbq19r","T3hbq21r","T3hbq22r","T3hbq23r","T3hbq24","T3hbq26r","T3hbq25r","T3hbq28r","T3hbq29r")],na.rm=T); alpha_PPeer_3
+alpha_PPeer_5 <- alpha(data_wide[,c("T5hbq17","T5hbq18r","T5hbq19r","T5hbq21r","T5hbq22r","T5hbq23r","T5hbq24","T5hbq25r","T5hbq26r","T5hbq28r","T5hbq29r")],na.rm=T); alpha_PPeer_5
+alpha_PPeer_10 <- alpha(data_wide[,c("T6hbqPPeer1","T6hbqPPeer2","T6hbqPPeer3","T6hbqPPeer4","T6hbqPPeer5","T6hbqPPeer6","T6hbqPPeer7","T6hbqPPeer8","T6hbqPPeer9","T6hbqPPeer10","T6hbqPPeer11")],na.rm=T); alpha_PPeer_10
+alpha_PPeer_12 <- alpha(data_wide[,c("T8hbqPPeer1","T8hbqPPeer2","T8hbqPPeer3","T8hbqPPeer4","T8hbqPPeer5","T8hbqPPeer6","T8hbqPPeer7","T8hbqPPeer8","T8hbqPPeer9","T8hbqPPeer10","T8hbqPPeer11")],na.rm=T); alpha_PPeer_12
+alpha_PPeer_14 <- alpha(data_wide[,c("T10hbqh14a","T10hbqh14br","T10hbqh14cr","T10hbqh14dr","T10hbqh14er","T10hbqh14fr","T10hbqh14g","T10hbqh14hr","T10hbqh14ir","T10hbqh14jr","T10hbqh14kr")],na.rm=T); alpha_PPeer_14
+
+##Teacher report
+alpha_TPeer_1 <- alpha(data_wide[,c("T1hbqt10","T1hbqt11r","T1hbqt12r","T1hbqt14r","T1hbqt15r","T1hbqt16r","T1hbqt17","T1hbqt18r","T1hbqt19r","T1hbqt21r","T1hbqt22r")],na.rm=T); alpha_TPeer_1
+alpha_TPeer_3 <- alpha(data_wide[,c("T3hbqt10","T3hbqt11r","T3hbqt12r","T3hbqt14r","T3hbqt15r","T3hbqt16r","T3hbqt17","T3hbqt18r","T3hbqt19r","T3hbqt21r","T3hbqt22r")],na.rm=T); alpha_TPeer_3
+alpha_TPeer_5 <- alpha(data_wide[,c("T5hbqt10","T5hbqt11r","T5hbqt12r","T5hbqt14r","T5hbqt15r","T5hbqt16r","T5hbqt17","T5hbqt18r","T5hbqt19r","T5hbqt21r","T5hbqt22r")],na.rm=T); alpha_TPeer_5
+alpha_TPeer_10 <- alpha(data_wide[,c("T6hbqTPeer1","T6hbqTPeer2","T6hbqTPeer3","T6hbqTPeer4","T6hbqTPeer5","T6hbqTPeer6","T6hbqTPeer7","T6hbqTPeer8","T6hbqTPeer9","T6hbqTPeer10","T6hbqTPeer11")],na.rm=T); alpha_TPeer_10
+alpha_TPeer_12 <- alpha(data_wide[,c("T8hbqTPeer1","T8hbqTPeer2","T8hbqTPeer3","T8hbqTPeer4","T8hbqTPeer5","T8hbqTPeer6","T8hbqTPeer7","T8hbqTPeer8","T8hbqTPeer9","T8hbqTPeer10","T8hbqTPeer11")],na.rm=T); alpha_TPeer_12
+alpha_TPeer_14 <- alpha(data_wide[,c("T10hbqt13a","T10hbqt13br","T10hbqt13cr","T10hbqt13dr","T10hbqt13er","T10hbqt13fr","T10hbqt13g","T10hbqt13hr","T10hbqt13ir","T10hbqt13jr","T10hbqt13kr")],na.rm=T); alpha_TPeer_14
+
+
+#Social Withdrawal
+##Parent report
+alpha_PSw_1 <- alpha(data_wide[,c("T1hbq76r","T1hbq92r","T1hbq100r","T1hbq106r","T1hbq117r","T1hbq131r","T1hbq144r")],na.rm=T); alpha_PSw_1
+alpha_PSw_3 <- alpha(data_wide[,c("T3hbq76r","T3hbq92r","T3hbq100r","T3hbq106r","T3hbq117r","T3hbq131r","T3hbq144r")],na.rm=T); alpha_PSw_3
+alpha_PSw_5 <- alpha(data_wide[,c("T5hbq76r","T5hbq92r","T5hbq100r","T5hbq106r","T5hbq117r","T5hbq131r","T5hbq144r")],na.rm=T); alpha_PSw_5
+alpha_PSw_10 <- alpha(data_wide[,c("T6hbqPSw1","T6hbqPSw2","T6hbqPSw3","T6hbqPSw4","T6hbqPSw5","T6hbqPSw6","T6hbqPSw7")],na.rm=T); alpha_PSw_10
+alpha_PSw_12 <- alpha(data_wide[,c("T8hbqPSw1","T8hbqPSw2","T8hbqPSw3","T8hbqPSw4","T8hbqPSw5","T8hbqPSw6","T8hbqPSw7")],na.rm=T); alpha_PSw_12
+alpha_PSw_14 <- alpha(data_wide[,c("T10hbqs49r","T10hbqs10r","T10hbqs31r","T10hbqs42r","T10hbqs65r","T10hbqs84r","T10hbqs100r")],na.rm=T); alpha_PSw_14
+
+##Teacher report
+alpha_TSw_1 <- alpha(data_wide[,c("T1hbqt74r","T1hbqt85r","T1hbqt91r","T1hbqt96r","T1hbqt106r","T1hbqt117r","T1hbqt130r")],na.rm=T); alpha_TSw_1
+alpha_TSw_3 <- alpha(data_wide[,c("T3hbqt74r","T3hbqt85r","T3hbqt91r","T3hbqt96r","T3hbqt106r","T3hbqt117r","T3hbqt130r")],na.rm=T); alpha_TSw_3
+alpha_TSw_5 <- alpha(data_wide[,c("T5hbqt74r","T5hbqt85r","T5hbqt91r","T5hbqt96r","T5hbqt106r","T5hbqt117r","T5hbqt130r")],na.rm=T); alpha_TSw_5
+alpha_TSw_10 <- alpha(data_wide[,c("T6hbqTSw1","T6hbqTSw2","T6hbqTSw3","T6hbqTSw4","T6hbqTSw5","T6hbqTSw6","T6hbqTSw7")],na.rm=T); alpha_TSw_10
+alpha_TSw_12 <- alpha(data_wide[,c("T8hbqTSw1","T8hbqTSw2","T8hbqTSw3","T8hbqTSw4","T8hbqTSw5","T8hbqTSw6","T8hbqTSw7")],na.rm=T); alpha_TSw_12
+alpha_TSw_14 <- alpha(data_wide[,c("T10hbqtb8r","T10hbqtb26r","T10hbqtb33r","T10hbqtb39r","T10hbqtb54r","T10hbqtb70r","T10hbqtb86r")],na.rm=T); alpha_TSw_14
+
+
+#Aggression
+##Parent report
+alpha_PAgg_1 <- alpha(data_wide[,c("T1hbq70","T1hbq83","T1hbq85","T1hbq96","T1hbq108","T1hbq127","T1hbq135","T1hbq139")],na.rm=T); alpha_PAgg_1
+alpha_PAgg_3 <- alpha(data_wide[,c("T3hbq70","T3hbq83","T3hbq85","T3hbq96","T3hbq108","T3hbq127","T3hbq135","T3hbq139")],na.rm=T); alpha_PAgg_3
+alpha_PAgg_5 <- alpha(data_wide[,c("T5hbq70","T5hbq83","T5hbq85","T5hbq96","T5hbq108","T5hbq127","T5hbq135","T5hbq139")],na.rm=T); alpha_PAgg_5
+alpha_PAgg_10 <- alpha(data_wide[,c("T6hbqPAgg1","T6hbqPAgg2","T6hbqPAgg3","T6hbqPAgg4","T6hbqPAgg5","T6hbqPAgg6","T6hbqPAgg7","T6hbqPAgg8")],na.rm=T); alpha_PAgg_10
+alpha_PAgg_12 <- alpha(data_wide[,c("T8hbqPAgg1","T8hbqPAgg2","T8hbqPAgg3","T8hbqPAgg4","T8hbqPAgg5","T8hbqPAgg6","T8hbqPAgg7","T8hbqPAgg8")],na.rm=T); alpha_PAgg_12
+alpha_PAgg_14 <- alpha(data_wide[,c("T10hbqs4","T10hbqs20","T10hbqs38","T10hbqs51","T10hbqs80","T10hbqs94","T10hbqs23","T10hbqs89")],na.rm=T); alpha_PAgg_14
+
+##Teacher report
+alpha_TAgg_1 <- alpha(data_wide[,c("T1hbqt70","T1hbqt79","T1hbqt81","T1hbqt88","T1hbqt98","T1hbqt114","T1hbqt120","T1hbqt124")],na.rm=T); alpha_TAgg_1
+alpha_TAgg_3 <- alpha(data_wide[,c("T3hbqt70","T3hbqt79","T3hbqt81","T3hbqt88","T3hbqt98","T3hbqt114","T3hbqt120","T3hbqt124")],na.rm=T); alpha_TAgg_3
+alpha_TAgg_5 <- alpha(data_wide[,c("T5hbqt70","T5hbqt79","T5hbqt81","T5hbqt88","T5hbqt98","T5hbqt114","T5hbqt120","T5hbqt124")],na.rm=T); alpha_TAgg_5
+alpha_TAgg_10 <- alpha(data_wide[,c("T6hbqTAgg1","T6hbqTAgg2","T6hbqTAgg3","T6hbqTAgg4","T6hbqTAgg5","T6hbqTAgg6","T6hbqTAgg7","T6hbqTAgg8")],na.rm=T); alpha_TAgg_10
+alpha_TAgg_12 <- alpha(data_wide[,c("T8hbqTAgg1","T8hbqTAgg2","T8hbqTAgg3","T8hbqTAgg4","T8hbqTAgg5","T8hbqTAgg6","T8hbqTAgg7","T8hbqTAgg8")],na.rm=T); alpha_TAgg_12
+alpha_TAgg_14 <- alpha(data_wide[,c("T10hbqtb4","T10hbqtb16","T10hbqtb30","T10hbqtb41","T10hbqtb67","T10hbqtb79","T10hbqtb19","T10hbqtb74")],na.rm=T); alpha_TAgg_14
+
+
+#Prosocial
+##Parent report
+alpha_PPro_1 <- alpha(data_wide[,c("T1hbq49","T1hbq53","T1hbq56","T1hbq58","T1hbq59","T1hbq61")],na.rm=T); alpha_PPro_1
+alpha_PPro_3 <- alpha(data_wide[,c("T3hbq49","T3hbq53","T3hbq56","T3hbq58","T3hbq59","T3hbq61")],na.rm=T); alpha_PPro_3
+alpha_PPro_5 <- alpha(data_wide[,c("T5hbq49","T5hbq53","T5hbq56","T5hbq58","T5hbq59","T5hbq61")],na.rm=T); alpha_PPro_5
+alpha_PPro_10 <- alpha(data_wide[,c("T6hbqPPro1","T6hbqPPro2","T6hbqPPro3","T6hbqPPro4","T6hbqPPro5","T6hbqPPro6")],na.rm=T); alpha_PPro_10
+alpha_PPro_12 <- alpha(data_wide[,c("T8hbqPPro1","T8hbqPPro2","T8hbqPPro3","T8hbqPPro4","T8hbqPPro5","T8hbqPPro6")],na.rm=T); alpha_PPro_12
+alpha_PPro_14 <- alpha(data_wide[,c("T10hbqh18c","T10hbqh18d","T10hbqh18e","T10hbqh18h","T10hbqh18i","T10hbqh18j")],na.rm=T); alpha_PPro_14
+
+##Teacher report
+alpha_TPro_1 <- alpha(data_wide[,c("T1hbqt49","T1hbqt53","T1hbqt56","T1hbqt58","T1hbqt59","T1hbqt60","T1hbqt61")],na.rm=T); alpha_TPro_1
+alpha_TPro_3 <- alpha(data_wide[,c("T3hbqt49","T3hbqt53","T3hbqt56","T3hbqt58","T3hbqt59","T3hbqt60","T3hbqt61")],na.rm=T); alpha_TPro_3
+alpha_TPro_5 <- alpha(data_wide[,c("T5hbqt49","T5hbqt53","T5hbqt56","T5hbqt58","T5hbqt59","T5hbqt60","T5hbqt61")],na.rm=T); alpha_TPro_5
+alpha_TPro_10 <- alpha(data_wide[,c("T6hbqTPro1","T6hbqTPro2","T6hbqTPro3","T6hbqTPro4","T6hbqTPro5","T6hbqTPro6")],na.rm=T); alpha_TPro_10
+alpha_TPro_12 <- alpha(data_wide[,c("T8hbqTPro1","T8hbqTPro2","T8hbqTPro3","T8hbqTPro4","T8hbqTPro5","T8hbqTPro6")],na.rm=T); alpha_TPro_12
+alpha_TPro_14 <- alpha(data_wide[,c("T10hbqt17c","T10hbqt17d","T10hbqt17e","T10hbqt17h","T10hbqt17i","T10hbqt17j")],na.rm=T); alpha_TPro_14
+```
+
+##Explanation of models
+5 main models: First, a baseline model where coupling parameters are fixed to 0. Second, an “interpersonal risk” model where coupling coefficients from dMDD ~ Peer (change in MDD symptoms predicted by Peer relations) are non-zero but are fixed across time. Third, an "interpersonal scar" model where coupling coefficients from dPeer ~ MDD (change in Peer relations predicted by MDD) are non-zero but are fixed across time. Fourth, a "transactional" model where coupling cofficients from Peer to dMDD and MDD to dPeer are non-zero but fixed across time. Fifth, a model where all coupling parameters (dPeer ~ MDD and dMDD ~ Peer) are free to vary over time, used to detect developmental changes in the relationship between Peer relations and MDD symptoms.
+
+Problematic assumptions: assumes measurement invariance & equal distance between assessments (which is true for the most part)
+Can test measurement invariance for all HBQ measures, but not for the MDD measures.
+Equal distance assumption should be fine since there is only 1 period that is unequal from the rest. Could try running the model from T6 on to see if the results show up the same.
+
+##Bivariate multiwave latent change model for Peer and MDD
+###Peer/MDD Baseline model
+```{r Peer/MDD Baseline model}
+Peer_MDD_B <- '
+#Defining the latent variables
+Peer1=~1*PPeer_1+1*TPeer_1
+Peer2=~1*PPeer_3+1*TPeer_3
+Peer3=~1*PPeer_5+1*TPeer_5
+Peer4=~1*PPeer_10+1*TPeer_10
+Peer5=~1*PPeer_12+1*TPeer_12
+Peer6=~1*PPeer_14+1*TPeer_14
+
+MDD1=~1*MDDPRP_1
+MDD2=~1*MDDPRP_3
+MDD3=~1*MDDPRP_5
+MDD4=~1*MDDPRP_10
+MDD5=~1*MDDPRP_12
+MDD6=~1*MDDPRP_14
+
+#Define regressions
+Peer2 ~ 1*Peer1     # This parameter regresses Peer2 perfectly on Peer1
+Peer3 ~ 1*Peer2
+Peer4 ~ 1*Peer3
+Peer5 ~ 1*Peer4
+Peer6 ~ 1*Peer5
+
+MDD2 ~ 1*MDD1     # This parameter regresses MDD2 perfectly on MDD1
+MDD3 ~ 1*MDD2
+MDD4 ~ 1*MDD3
+MDD5 ~ 1*MDD4
+MDD6 ~ 1*MDD5
+
+#Define the change score
+dPeer1 =~ 1*Peer2        # This defines the change score as measured perfectly by scores on Peer2
+dPeer2 =~ 1*Peer3
+dPeer3 =~ 1*Peer4
+dPeer4 =~ 1*Peer5
+dPeer5 =~ 1*Peer6
+         
+dMDD1 =~ 1*MDD2           # This defines the change score as measured perfectly by scores on MDDPRP2
+dMDD2 =~ 1*MDD3           
+dMDD3 =~ 1*MDD4
+dMDD4 =~ 1*MDD5
+dMDD5 =~ 1*MDD6
+
+#Estimate residual variances
+PPeer_1~~PPeer_1          # This estimates the PPeer residual variances
+PPeer_3~~PPeer_3
+PPeer_5~~PPeer_5
+PPeer_10~~PPeer_10
+PPeer_12~~PPeer_12
+PPeer_14~~PPeer_14
+
+TPeer_1~~TPeer_1          # This estimates the TPeerresidual variances
+TPeer_3~~TPeer_3
+TPeer_5~~TPeer_5
+TPeer_10~~TPeer_10
+TPeer_12~~TPeer_12
+TPeer_14~~TPeer_14
+
+MDDPRP_1~~MDDPRP_1          # This estimates the MDD residual variances
+MDDPRP_3~~MDDPRP_3
+MDDPRP_5~~MDDPRP_5
+MDDPRP_10~~MDDPRP_10
+MDDPRP_12~~MDDPRP_12
+MDDPRP_14~~MDDPRP_14
+
+
+#Covariates
+Peer1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+MDD1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+
+#Dynamics
+
+#Estimate the self-feedback parameters
+dPeer1~F1*Peer1       # This estimates the Peer self-feedback parameter
+dPeer2~F1*Peer2
+dPeer3~F1*Peer3
+dPeer4~F1*Peer4
+dPeer5~F1*Peer5
+
+dMDD1~F2*MDD1       # This estimates the MDD self-feedback parameter
+dMDD2~F2*MDD2
+dMDD3~F2*MDD3
+dMDD4~F2*MDD4
+dMDD5~F2*MDD5
+
+#Estimate coupling parameter
+dMDD1~0*Peer1         # This estimates the Peer to MDD coupling parameter
+dMDD2~0*Peer2
+dMDD3~0*Peer3
+dMDD4~0*Peer4
+dMDD5~0*Peer5
+
+dPeer1~0*MDD1         # This estimates the MDD to Peer coupling parameter
+dPeer2~0*MDD2
+dPeer3~0*MDD3
+dPeer4~0*MDD4
+dPeer5~0*MDD5
+
+iPeer=~1*Peer1                   # This defines the Peer intercept measurement model
+sPeer=~1*dPeer1+ 1*dPeer2+ 1*dPeer3+ 1*dPeer4+ 1*dPeer5 # This defines the Peer slope measurement model
+iPeer~1                             # This estimates the Peer intercept intercept (mean)
+iPeer~~iPeer                         # This estimates the Peer intercept variance
+sPeer~1                             # This estimates the Peer slope intercept
+sPeer~~sPeer                         # This estimates the Peer slope variance
+
+iMDD=~1*MDD1                   # This defines the MDD intercept measurement model
+sMDD=~1*dMDD1+ 1*dMDD2+ 1*dMDD3+ 1*dMDD4+ 1*dMDD5 # This defines the MDD slope measurement model
+iMDD~1                             # This estimates the MDD intercept intercept (mean)
+iMDD~~iMDD                         # This estimates the MDD intercept variance
+sMDD~1                             # This estimates the MDD slope intercept
+sMDD~~sMDD                         # This estimates the MDD slope variance
+
+iMDD~~sMDD                      # This estimates the iMDD sMDD covariance
+iMDD~~sPeer                      # This estimates the iMDD sPeer covariance
+iMDD~~iPeer                      # This estimates the iMDD iPeer covariance
+iPeer~~sPeer                      # This estimates the iPeer sPeer covariance
+iPeer~~sMDD                      # This estimates the iPeer sMDD covariance
+sPeer~~sMDD                      # This estimates the sPeer sMDD covariance
+'
+
+fit_Peer_MDD_B <- lavaan(Peer_MDD_B, data=data_wide, missing="FIML", estimator="MLR")
+
+summary(fit_Peer_MDD_B, fit.measures=T, standardized=T)
+
+semPaths(fit_Peer_MDD_B, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+```
+
+###Peer/MDD Interpersonal Risk model
+```{r Peer/MDD Interpersonal Risk model}
+Peer_MDD_IR <- '
+#Defining the latent variables
+Peer1=~1*PPeer_1+1*TPeer_1
+Peer2=~1*PPeer_3+1*TPeer_3
+Peer3=~1*PPeer_5+1*TPeer_5
+Peer4=~1*PPeer_10+1*TPeer_10
+Peer5=~1*PPeer_12+1*TPeer_12
+Peer6=~1*PPeer_14+1*TPeer_14
+
+MDD1=~1*MDDPRP_1
+MDD2=~1*MDDPRP_3
+MDD3=~1*MDDPRP_5
+MDD4=~1*MDDPRP_10
+MDD5=~1*MDDPRP_12
+MDD6=~1*MDDPRP_14
+
+#Define regressions
+Peer2 ~ 1*Peer1     # This parameter regresses Peer2 perfectly on Peer1
+Peer3 ~ 1*Peer2
+Peer4 ~ 1*Peer3
+Peer5 ~ 1*Peer4
+Peer6 ~ 1*Peer5
+
+MDD2 ~ 1*MDD1     # This parameter regresses MDD2 perfectly on MDD1
+MDD3 ~ 1*MDD2
+MDD4 ~ 1*MDD3
+MDD5 ~ 1*MDD4
+MDD6 ~ 1*MDD5
+
+#Define the change score
+dPeer1 =~ 1*Peer2        # This defines the change score as measured perfectly by scores on Peer2
+dPeer2 =~ 1*Peer3
+dPeer3 =~ 1*Peer4
+dPeer4 =~ 1*Peer5
+dPeer5 =~ 1*Peer6
+         
+dMDD1 =~ 1*MDD2           # This defines the change score as measured perfectly by scores on MDD2
+dMDD2 =~ 1*MDD3           
+dMDD3 =~ 1*MDD4
+dMDD4 =~ 1*MDD5
+dMDD5 =~ 1*MDD6
+
+#Estimate residual variances
+PPeer_1~~PPeer_1          # This estimates the PPeer residual variances
+PPeer_3~~PPeer_3
+PPeer_5~~PPeer_5
+PPeer_10~~PPeer_10
+PPeer_12~~PPeer_12
+PPeer_14~~PPeer_14
+
+TPeer_1~~TPeer_1          # This estimates the TPeerresidual variances
+TPeer_3~~TPeer_3
+TPeer_5~~TPeer_5
+TPeer_10~~TPeer_10
+TPeer_12~~TPeer_12
+TPeer_14~~TPeer_14
+
+MDDPRP_1~~MDDPRP_1          # This estimates the MDD residual variances
+MDDPRP_3~~MDDPRP_3
+MDDPRP_5~~MDDPRP_5
+MDDPRP_10~~MDDPRP_10
+MDDPRP_12~~MDDPRP_12
+MDDPRP_14~~MDDPRP_14
+
+
+#Covariates
+Peer1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+MDD1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+
+#Dynamics
+
+#Estimate the self-feedback parameters
+dPeer1~F1*Peer1       # This estimates the Peer self-feedback parameter
+dPeer2~F1*Peer2
+dPeer3~F1*Peer3
+dPeer4~F1*Peer4
+dPeer5~F1*Peer5
+
+dMDD1~F2*MDD1       # This estimates the MDD self-feedback parameter
+dMDD2~F2*MDD2
+dMDD3~F2*MDD3
+dMDD4~F2*MDD4
+dMDD5~F2*MDD5
+
+#Estimate coupling parameter
+dMDD1~C1*Peer1         # This estimates the Peer to MDD coupling parameter
+dMDD2~C1*Peer2
+dMDD3~C1*Peer3
+dMDD4~C1*Peer4
+dMDD5~C1*Peer5
+
+dPeer1~0*MDD1         # This estimates the MDD to Peer coupling parameter
+dPeer2~0*MDD2
+dPeer3~0*MDD3
+dPeer4~0*MDD4
+dPeer5~0*MDD5
+
+iPeer=~1*Peer1                   # This defines the Peer intercept measurement model
+sPeer=~1*dPeer1+ 1*dPeer2+ 1*dPeer3+ 1*dPeer4+ 1*dPeer5 # This defines the Peer slope measurement model
+iPeer~1                             # This estimates the Peer intercept intercept (mean)
+iPeer~~iPeer                         # This estimates the Peer intercept variance
+sPeer~1                             # This estimates the Peer slope intercept
+sPeer~~sPeer                         # This estimates the Peer slope variance
+
+iMDD=~1*MDD1                   # This defines the MDD intercept measurement model
+sMDD=~1*dMDD1+ 1*dMDD2+ 1*dMDD3+ 1*dMDD4+ 1*dMDD5 # This defines the MDD slope measurement model
+iMDD~1                             # This estimates the MDD intercept intercept (mean)
+iMDD~~iMDD                         # This estimates the MDD intercept variance
+sMDD~1                             # This estimates the MDD slope intercept
+sMDD~~sMDD                         # This estimates the MDD slope variance
+
+iMDD~~sMDD                      # This estimates the iMDD sMDD covariance
+iMDD~~sPeer                      # This estimates the iMDD sPeer covariance
+iMDD~~iPeer                      # This estimates the iMDD iPeer covariance
+iPeer~~sPeer                      # This estimates the iPeer sPeer covariance
+iPeer~~sMDD                      # This estimates the iPeer sMDD covariance
+sPeer~~sMDD                      # This estimates the sPeer sMDD covariance
+'
+
+fit_Peer_MDD_IR <- lavaan(Peer_MDD_IR, data=data_wide, missing="FIML", estimator="MLR")
+
+summary(fit_Peer_MDD_IR, fit.measures=T, standardized=T)
+
+fitmeasures(fit_Peer_MDD_IR, fit.measures=c("all"), baseline.model= fit_Peer_MDD_B)
+
+semPaths(fit_Peer_MDD_IR, 'std', 'est', curvePivot=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+```
+
+###Peer/MDD Interpersonal Scar model
+```{r Peer/MDD Interpersonal Risk model}
+Peer_MDD_IS <- '
+#Defining the latent variables
+Peer1=~1*PPeer_1+1*TPeer_1
+Peer2=~1*PPeer_3+1*TPeer_3
+Peer3=~1*PPeer_5+1*TPeer_5
+Peer4=~1*PPeer_10+1*TPeer_10
+Peer5=~1*PPeer_12+1*TPeer_12
+Peer6=~1*PPeer_14+1*TPeer_14
+
+MDD1=~1*MDDPRP_1
+MDD2=~1*MDDPRP_3
+MDD3=~1*MDDPRP_5
+MDD4=~1*MDDPRP_10
+MDD5=~1*MDDPRP_12
+MDD6=~1*MDDPRP_14
+
+#Define regressions
+Peer2 ~ 1*Peer1     # This parameter regresses PPeer_3 perfectly on PPeer_1
+Peer3 ~ 1*Peer2
+Peer4 ~ 1*Peer3
+Peer5 ~ 1*Peer4
+Peer6 ~ 1*Peer5
+
+MDD2 ~ 1*MDD1     # This parameter regresses MDD2 perfectly on MDD1
+MDD3 ~ 1*MDD2
+MDD4 ~ 1*MDD3
+MDD5 ~ 1*MDD4
+MDD6 ~ 1*MDD5
+
+#Define the change score
+dPeer1 =~ 1*Peer2        # This defines the change score as measured perfectly by scores on PPeer_3
+dPeer2 =~ 1*Peer3
+dPeer3 =~ 1*Peer4
+dPeer4 =~ 1*Peer5
+dPeer5 =~ 1*Peer6
+
+dMDD1 =~ 1*MDD2           # This defines the change score as measured perfectly by scores on MDDPRP_3
+dMDD2 =~ 1*MDD3           
+dMDD3 =~ 1*MDD4
+dMDD4 =~ 1*MDD5
+dMDD5 =~ 1*MDD6
+
+#Estimate residual variances
+PPeer_1~~PPeer_1          # This estimates the PPeer residual variances
+PPeer_3~~PPeer_3
+PPeer_5~~PPeer_5
+PPeer_10~~PPeer_10
+PPeer_12~~PPeer_12
+PPeer_14~~PPeer_14
+
+TPeer_1~~TPeer_1          # This estimates the TPeerresidual variances
+TPeer_3~~TPeer_3
+TPeer_5~~TPeer_5
+TPeer_10~~TPeer_10
+TPeer_12~~TPeer_12
+TPeer_14~~TPeer_14
+
+MDDPRP_1~~MDDPRP_1          # This estimates the MDD residual variances
+MDDPRP_3~~MDDPRP_3
+MDDPRP_5~~MDDPRP_5
+MDDPRP_10~~MDDPRP_10
+MDDPRP_12~~MDDPRP_12
+MDDPRP_14~~MDDPRP_14
+
+
+#Covariates
+Peer1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+MDD1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+
+#Dynamics
+
+#Estimate the self-feedback parameters
+dPeer1~F1*Peer1       # This estimates the Peer self-feedback parameter
+dPeer2~F1*Peer2
+dPeer3~F1*Peer3
+dPeer4~F1*Peer4
+dPeer5~F1*Peer5
+
+dMDD1~F2*MDD1       # This estimates the MDD self-feedback parameter
+dMDD2~F2*MDD2
+dMDD3~F2*MDD3
+dMDD4~F2*MDD4
+dMDD5~F2*MDD5
+
+#Estimate coupling parameter
+dMDD1~0*Peer1         # This estimates the Peer to MDD coupling parameter
+dMDD2~0*Peer2
+dMDD3~0*Peer3
+dMDD4~0*Peer4
+dMDD5~0*Peer5
+
+dPeer1~C2*MDD1         # This estimates the MDD to Peer coupling parameter
+dPeer2~C2*MDD2
+dPeer3~C2*MDD3
+dPeer4~C2*MDD4
+dPeer5~C2*MDD5
+
+iPeer=~1*Peer1                   # This defines the Peer intercept measurement model
+sPeer=~1*dPeer1+ 1*dPeer2+ 1*dPeer3+ 1*dPeer4+ 1*dPeer5 # This defines the Peer slope measurement model
+iPeer~1                             # This estimates the Peer intercept intercept (mean)
+iPeer~~iPeer                         # This estimates the Peer intercept variance
+sPeer~1                             # This estimates the Peer slope intercept
+sPeer~~sPeer                         # This estimates the Peer slope variance
+
+iMDD=~1*MDD1                   # This defines the MDD intercept measurement model
+sMDD=~1*dMDD1+ 1*dMDD2+ 1*dMDD3+ 1*dMDD4+ 1*dMDD5 # This defines the MDD slope measurement model
+iMDD~1                             # This estimates the MDD intercept intercept (mean)
+iMDD~~iMDD                         # This estimates the MDD intercept variance
+sMDD~1                             # This estimates the MDD slope intercept
+sMDD~~sMDD                         # This estimates the MDD slope variance
+
+iMDD~~sMDD                      # This estimates the iMDD sMDD covariance
+iMDD~~sPeer                      # This estimates the iMDD sPeer covariance
+iMDD~~iPeer                      # This estimates the iMDD iPeer covariance
+iPeer~~sPeer                      # This estimates the iPeer sPeer covariance
+iPeer~~sMDD                      # This estimates the iPeer sMDD covariance
+sPeer~~sMDD                      # This estimates the sPeer sMDD covariance
+'
+
+fit_Peer_MDD_IS <- lavaan(Peer_MDD_IS, data=data_wide, missing="FIML", estimator="MLR")
+
+summary(fit_Peer_MDD_IS, fit.measures=T, standardized=T)
+
+fitmeasures(fit_Peer_MDD_IS, fit.measures=c("all"), baseline.model= fit_Peer_MDD_B)
+
+semPaths(fit_Peer_MDD_IS, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+```
+
+###Peer/MDD Transactional model
+```{r Peer/MDD Transactional model}
+Peer_MDD_T <- '
+#Defining the latent variables
+Peer1=~1*PPeer_1+1*TPeer_1
+Peer2=~1*PPeer_3+1*TPeer_3
+Peer3=~1*PPeer_5+1*TPeer_5
+Peer4=~1*PPeer_10+1*TPeer_10
+Peer5=~1*PPeer_12+1*TPeer_12
+Peer6=~1*PPeer_14+1*TPeer_14
+
+MDD1=~1*MDDPRP_1
+MDD2=~1*MDDPRP_3
+MDD3=~1*MDDPRP_5
+MDD4=~1*MDDPRP_10
+MDD5=~1*MDDPRP_12
+MDD6=~1*MDDPRP_14
+
+#Define regressions
+Peer2 ~ 1*Peer1     # This parameter regresses PPeer_3 perfectly on PPeer_1
+Peer3 ~ 1*Peer2
+Peer4 ~ 1*Peer3
+Peer5 ~ 1*Peer4
+Peer6 ~ 1*Peer5
+
+MDD2 ~ 1*MDD1     # This parameter regresses MDD2 perfectly on MDD1
+MDD3 ~ 1*MDD2
+MDD4 ~ 1*MDD3
+MDD5 ~ 1*MDD4
+MDD6 ~ 1*MDD5
+
+#Define the change score
+dPeer1 =~ 1*Peer2        # This defines the change score as measured perfectly by scores on PPeer_3
+dPeer2 =~ 1*Peer3
+dPeer3 =~ 1*Peer4
+dPeer4 =~ 1*Peer5
+dPeer5 =~ 1*Peer6
+         
+dMDD1 =~ 1*MDD2           # This defines the change score as measured perfectly by scores on MDDPRP_3
+dMDD2 =~ 1*MDD3           
+dMDD3 =~ 1*MDD4
+dMDD4 =~ 1*MDD5
+dMDD5 =~ 1*MDD6
+
+#Estimate residual variances
+PPeer_1~~PPeer_1          # This estimates the PPeer residual variances
+PPeer_3~~PPeer_3
+PPeer_5~~PPeer_5
+PPeer_10~~PPeer_10
+PPeer_12~~PPeer_12
+PPeer_14~~PPeer_14
+
+TPeer_1~~TPeer_1          # This estimates the TPeerresidual variances
+TPeer_3~~TPeer_3
+TPeer_5~~TPeer_5
+TPeer_10~~TPeer_10
+TPeer_12~~TPeer_12
+TPeer_14~~TPeer_14
+
+MDDPRP_1~~MDDPRP_1          # This estimates the MDD residual variances
+MDDPRP_3~~MDDPRP_3
+MDDPRP_5~~MDDPRP_5
+MDDPRP_10~~MDDPRP_10
+MDDPRP_12~~MDDPRP_12
+MDDPRP_14~~MDDPRP_14
+
+
+#Covariates
+Peer1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+MDD1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+
+#Dynamics
+
+#Estimate the self-feedback parameters
+dPeer1~F1*Peer1       # This estimates the Peer self-feedback parameter
+dPeer2~F1*Peer2
+dPeer3~F1*Peer3
+dPeer4~F1*Peer4
+dPeer5~F1*Peer5
+
+dMDD1~F2*MDD1       # This estimates the MDD self-feedback parameter
+dMDD2~F2*MDD2
+dMDD3~F2*MDD3
+dMDD4~F2*MDD4
+dMDD5~F2*MDD5
+
+#Estimate coupling parameter
+dMDD1~C1*Peer1         # This estimates the Peer to MDD coupling parameter
+dMDD2~C1*Peer2
+dMDD3~C1*Peer3
+dMDD4~C1*Peer4
+dMDD5~C1*Peer5
+
+dPeer1~C2*MDD1         # This estimates the MDD to Peer coupling parameter
+dPeer2~C2*MDD2
+dPeer3~C2*MDD3
+dPeer4~C2*MDD4
+dPeer5~C2*MDD5
+
+iPeer=~1*Peer1                   # This defines the Peer intercept measurement model
+sPeer=~1*dPeer1+ 1*dPeer2+ 1*dPeer3+ 1*dPeer4+ 1*dPeer5 # This defines the Peer slope measurement model
+iPeer~1                             # This estimates the Peer intercept intercept (mean)
+iPeer~~iPeer                         # This estimates the Peer intercept variance
+sPeer~1                             # This estimates the Peer slope intercept
+sPeer~~sPeer                         # This estimates the Peer slope variance
+
+iMDD=~1*MDD1                   # This defines the MDD intercept measurement model
+sMDD=~1*dMDD1+ 1*dMDD2+ 1*dMDD3+ 1*dMDD4+ 1*dMDD5 # This defines the MDD slope measurement model
+iMDD~1                             # This estimates the MDD intercept intercept (mean)
+iMDD~~iMDD                         # This estimates the MDD intercept variance
+sMDD~1                             # This estimates the MDD slope intercept
+sMDD~~sMDD                         # This estimates the MDD slope variance
+
+iMDD~~sMDD                      # This estimates the iMDD sMDD covariance
+iMDD~~sPeer                      # This estimates the iMDD sPeer covariance
+iMDD~~iPeer                      # This estimates the iMDD iPeer covariance
+iPeer~~sPeer                      # This estimates the iPeer sPeer covariance
+iPeer~~sMDD                      # This estimates the iPeer sMDD covariance
+sPeer~~sMDD                      # This estimates the sPeer sMDD covariance
+'
+
+fit_Peer_MDD_T <- lavaan(Peer_MDD_T, data=data_wide, missing="FIML", estimator="MLR")
+
+summary(fit_Peer_MDD_T, fit.measures=T, standardized=T)
+
+fitmeasures(fit_Peer_MDD_T, fit.measures=c("all"), baseline.model= fit_Peer_MDD_B)
+
+semPaths(fit_Peer_MDD_T, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+```
+
+###Peer/MDD Developmental change model
+```{r Peer/MDD Developmental change model}
+Peer_MDD <- '
+#Defining the latent variables
+Peer1=~1*PPeer_1+1*TPeer_1
+Peer2=~1*PPeer_3+1*TPeer_3
+Peer3=~1*PPeer_5+1*TPeer_5
+Peer4=~1*PPeer_10+1*TPeer_10
+Peer5=~1*PPeer_12+1*TPeer_12
+Peer6=~1*PPeer_14+1*TPeer_14
+
+MDD1=~1*MDDPRP_1
+MDD2=~1*MDDPRP_3
+MDD3=~1*MDDPRP_5
+MDD4=~1*MDDPRP_10
+MDD5=~1*MDDPRP_12
+MDD6=~1*MDDPRP_14
+
+#Define regressions
+Peer2 ~ 1*Peer1
+Peer3 ~ 1*Peer2
+Peer4 ~ 1*Peer3
+Peer5 ~ 1*Peer4
+Peer6 ~ 1*Peer5
+
+MDD2 ~ 1*MDD1
+MDD3 ~ 1*MDD2
+MDD4 ~ 1*MDD3
+MDD5 ~ 1*MDD4
+MDD6 ~ 1*MDD5
+
+#Define the change score
+dPeer1 =~ 1*Peer2
+dPeer2 =~ 1*Peer3
+dPeer3 =~ 1*Peer4
+dPeer4 =~ 1*Peer5
+dPeer5 =~ 1*Peer6
+         
+dMDD1 =~ 1*MDD2
+dMDD2 =~ 1*MDD3           
+dMDD3 =~ 1*MDD4
+dMDD4 =~ 1*MDD5
+dMDD5 =~ 1*MDD6
+
+#Estimate residual variances
+PPeer_1~~PPeer_1          # This estimates the PPeer residual variances
+PPeer_3~~PPeer_3
+PPeer_5~~PPeer_5
+PPeer_10~~PPeer_10
+PPeer_12~~PPeer_12
+PPeer_14~~PPeer_14
+
+TPeer_1~~TPeer_1          # This estimates the TPeerresidual variances
+TPeer_3~~TPeer_3
+TPeer_5~~TPeer_5
+TPeer_10~~TPeer_10
+TPeer_12~~TPeer_12
+TPeer_14~~TPeer_14
+
+MDDPRP_1~~MDDPRP_1          # This estimates the MDD residual variances
+MDDPRP_3~~MDDPRP_3
+MDDPRP_5~~MDDPRP_5
+MDDPRP_10~~MDDPRP_10
+MDDPRP_12~~MDDPRP_12
+MDDPRP_14~~MDDPRP_14
+
+
+#Covariates
+Peer1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+MDD1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+MDD6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+
+#Dynamics
+
+#Estimate the self-feedback parameters
+dPeer1~Peer1       # This estimates the Peer self-feedback parameter
+dPeer2~Peer2
+dPeer3~Peer3
+dPeer4~Peer4
+dPeer5~Peer5
+
+dMDD1~MDD1       # This estimates the MDD self-feedback parameter
+dMDD2~MDD2
+dMDD3~MDD3
+dMDD4~MDD4
+dMDD5~MDD5
+
+#Estimate coupling parameter
+dMDD1~Peer1         # This estimates the Peer to MDD coupling parameter
+dMDD2~Peer2
+dMDD3~Peer3
+dMDD4~Peer4
+dMDD5~Peer5
+
+dPeer1~MDD1         # This estimates the MDD to Peer coupling parameter
+dPeer2~MDD2
+dPeer3~MDD3
+dPeer4~MDD4
+dPeer5~MDD5
+
+iPeer=~1*Peer1                   # This defines the Peer intercept measurement model
+sPeer=~1*dPeer1+ 1*dPeer2+ 1*dPeer3+ 1*dPeer4+ 1*dPeer5 # This defines the Peer slope measurement model
+iPeer~1                             # This estimates the Peer intercept intercept (mean)
+iPeer~~iPeer                         # This estimates the Peer intercept variance
+sPeer~1                             # This estimates the Peer slope intercept
+sPeer~~sPeer                         # This estimates the Peer slope variance
+
+iMDD=~1*MDD1                   # This defines the MDD intercept measurement model
+sMDD=~1*dMDD1+ 1*dMDD2+ 1*dMDD3+ 1*dMDD4+ 1*dMDD5 # This defines the MDD slope measurement model
+iMDD~1                             # This estimates the MDD intercept intercept (mean)
+iMDD~~iMDD                         # This estimates the MDD intercept variance
+sMDD~1                             # This estimates the MDD slope intercept
+sMDD~~sMDD                         # This estimates the MDD slope variance
+
+iMDD~~sMDD                      # This estimates the iMDD sMDD covariance
+iMDD~~sPeer                      # This estimates the iMDD sPeer covariance
+iMDD~~iPeer                      # This estimates the iMDD iPeer covariance
+iPeer~~sPeer                      # This estimates the iPeer sPeer covariance
+iPeer~~sMDD                      # This estimates the iPeer sMDD covariance
+sPeer~~sMDD                      # This estimates the sPeer sMDD covariance
+'
+
+fit_Peer_MDD <- lavaan(Peer_MDD, data=data_wide, missing="FIML", estimator="MLR")
+
+summary(fit_Peer_MDD, fit.measures=T, standardized=T)
+
+#Figure 1: Theoretical model
+semPaths(fit_Peer_MDD, 'mod', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=4, sizeInt=2, sizeLat=3, intercepts=F, residuals=T)
+
+#Figure 2: Model fit to data
+semPaths(fit_Peer_MDD, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+
+fitmeasures(fit_Peer_MDD, fit.measures=c("all"), baseline.model= fit_Peer_MDD_B)
+
+fit_Peer_BMWLC_sf_c_parameters <- parameterEstimates(fit_Peer_MDD)[57:76,]
+```
+
+###Peer/MDD Model comparison
+```{r Model comparison}
+Peer_MDD_comparison <- matrix(ncol=6,nrow=6)
+Peer_MDD_comparison <- as.data.frame(Peer_MDD_comparison)
+Peer_MDD_comparison[,1] <- c("chisq","cfi.robust","rmsea.robust","logl","bic","aic")
+colnames(Peer_MDD_comparison) <- c("Fit_Statistics","Baseline","Interpersonal_Scar","Interpersonal_Risk","Transactional","Developmental")
+
+Peer_MDD_comparison[,2] <- fitmeasures(fit_Peer_MDD_B, fit.measures=c("chisq","cfi.robust","rmsea.robust","logl","bic","aic"))
+Peer_MDD_comparison[,3] <- fitmeasures(fit_Peer_MDD_IS, fit.measures=c("chisq","cfi.robust","rmsea.robust","logl","bic","aic"))
+Peer_MDD_comparison[,4] <- fitmeasures(fit_Peer_MDD_IR, fit.measures=c("chisq","cfi.robust","rmsea.robust","logl","bic","aic"))
+Peer_MDD_comparison[,5] <- fitmeasures(fit_Peer_MDD_T, fit.measures=c("chisq","cfi.robust","rmsea.robust","logl","bic","aic"))
+Peer_MDD_comparison[,6] <- fitmeasures(fit_Peer_MDD, fit.measures=c("chisq","cfi.robust","rmsea.robust","logl","bic","aic"))
+
+Peer_MDD_comparison[,2:6] <- round(Peer_MDD_comparison[,2:6], digits=3)
+```
+
+
+##Bivariate multiwave latent change model for Peer and INTL
+###Peer/INTL Baseline model
+```{r Peer/INTL Baseline model}
+Peer_INTL_B <- '
+#Defining the latent variables
+Peer1=~1*PPeer_1+1*TPeer_1
+Peer2=~1*PPeer_3+1*TPeer_3
+Peer3=~1*PPeer_5+1*TPeer_5
+Peer4=~1*PPeer_10+1*TPeer_10
+Peer5=~1*PPeer_12+1*TPeer_12
+Peer6=~1*PPeer_14+1*TPeer_14
+
+INTL1=~1*INTL_1
+INTL2=~1*INTL_3
+INTL3=~1*INTL_5
+INTL4=~1*INTL_10
+INTL5=~1*INTL_12
+INTL6=~1*INTL_14
+
+#Define regressions
+Peer2 ~ 1*Peer1     # This parameter regresses Peer2 perfectly on Peer1
+Peer3 ~ 1*Peer2
+Peer4 ~ 1*Peer3
+Peer5 ~ 1*Peer4
+Peer6 ~ 1*Peer5
+
+INTL2 ~ 1*INTL1     # This parameter regresses INTL2 perfectly on INTL1
+INTL3 ~ 1*INTL2
+INTL4 ~ 1*INTL3
+INTL5 ~ 1*INTL4
+INTL6 ~ 1*INTL5
+
+#Define the change score
+dPeer1 =~ 1*Peer2        # This defines the change score as measured perfectly by scores on Peer2
+dPeer2 =~ 1*Peer3
+dPeer3 =~ 1*Peer4
+dPeer4 =~ 1*Peer5
+dPeer5 =~ 1*Peer6
+         
+dINTL1 =~ 1*INTL2           # This defines the change score as measured perfectly by scores on INTL2**
+dINTL2 =~ 1*INTL3           
+dINTL3 =~ 1*INTL4
+dINTL4 =~ 1*INTL5
+dINTL5 =~ 1*INTL6
+
+#Estimate residual variances
+PPeer_1~~PPeer_1          # This estimates the PPeerresidual variances
+PPeer_3~~PPeer_3
+PPeer_5~~PPeer_5
+PPeer_10~~PPeer_10
+PPeer_12~~PPeer_12
+PPeer_14~~PPeer_14
+
+TPeer_1~~TPeer_1          # This estimates the TPeerresidual variances
+TPeer_3~~TPeer_3
+TPeer_5~~TPeer_5
+TPeer_10~~TPeer_10
+TPeer_12~~TPeer_12
+TPeer_14~~TPeer_14
+
+INTL_1~~INTL_1          # This estimates the INTL residual variances
+INTL_3~~INTL_3
+INTL_5~~INTL_5
+INTL_10~~INTL_10
+INTL_12~~INTL_12
+INTL_14~~INTL_14
+
+
+#Covariates
+Peer1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+INTL1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+
+#Dynamics
+
+#Estimate the self-feedback parameters
+dPeer1~F1*Peer1       # This estimates the Peer self-feedback parameter
+dPeer2~F1*Peer2
+dPeer3~F1*Peer3
+dPeer4~F1*Peer4
+dPeer5~F1*Peer5
+
+dINTL1~F2*INTL1       # This estimates the INTL self-feedback parameter
+dINTL2~F2*INTL2
+dINTL3~F2*INTL3
+dINTL4~F2*INTL4
+dINTL5~F2*INTL5
+
+#Estimate coupling parameter
+dINTL1~0*Peer1         # This estimates the Peer to INTL coupling parameter
+dINTL2~0*Peer2
+dINTL3~0*Peer3
+dINTL4~0*Peer4
+dINTL5~0*Peer5
+
+dPeer1~0*INTL1         # This estimates the INTL to Peer coupling parameter
+dPeer2~0*INTL2
+dPeer3~0*INTL3
+dPeer4~0*INTL4
+dPeer5~0*INTL5
+
+iPeer=~1*Peer1                   # This defines the Peer intercept measurement model
+sPeer=~1*dPeer1+ 1*dPeer2+ 1*dPeer3+ 1*dPeer4+ 1*dPeer5 # This defines the Peer slope measurement model
+iPeer~1                             # This estimates the Peer intercept intercept (mean)
+iPeer~~iPeer                         # This estimates the Peer intercept variance
+sPeer~1                             # This estimates the Peer slope intercept
+sPeer~~sPeer                         # This estimates the Peer slope variance
+
+iINTL=~1*INTL1                   # This defines the INTL intercept measurement model
+sINTL=~1*dINTL1+ 1*dINTL2+ 1*dINTL3+ 1*dINTL4+ 1*dINTL5 # This defines the INTL slope measurement model
+iINTL~1                             # This estimates the INTL intercept intercept (mean)
+iINTL~~iINTL                         # This estimates the INTL intercept variance
+sINTL~1                             # This estimates the INTL slope intercept
+sINTL~~sINTL                         # This estimates the INTL slope variance
+
+iINTL~~sINTL                      # This estimates the iINTL sINTL covariance
+iINTL~~sPeer                      # This estimates the iINTL sPeer covariance
+iINTL~~iPeer                      # This estimates the iINTL iPeer covariance
+iPeer~~sPeer                      # This estimates the iPeer sPeer covariance
+iPeer~~sINTL                      # This estimates the iPeer sINTL covariance
+sPeer~~sINTL                      # This estimates the sPeer sINTL covariance
+'
+
+fit_Peer_INTL_B <- lavaan(Peer_INTL_B, data=data_wide, missing="FIML", estimator="MLR")
+
+summary(fit_Peer_INTL_B, fit.measures=T, standardized=T)
+
+semPaths(fit_Peer_INTL_B, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+```
+
+###Peer/INTL Interpersonal Risk model
+```{r Peer/INTL Interpersonal Risk model}
+Peer_INTL_IR <- '
+#Defining the latent variables
+Peer1=~1*PPeer_1+1*TPeer_1
+Peer2=~1*PPeer_3+1*TPeer_3
+Peer3=~1*PPeer_5+1*TPeer_5
+Peer4=~1*PPeer_10+1*TPeer_10
+Peer5=~1*PPeer_12+1*TPeer_12
+Peer6=~1*PPeer_14+1*TPeer_14
+
+INTL1=~1*INTL_1
+INTL2=~1*INTL_3
+INTL3=~1*INTL_5
+INTL4=~1*INTL_10
+INTL5=~1*INTL_12
+INTL6=~1*INTL_14
+
+#Define regressions
+Peer2 ~ 1*Peer1     # This parameter regresses Peer2 perfectly on Peer1
+Peer3 ~ 1*Peer2
+Peer4 ~ 1*Peer3
+Peer5 ~ 1*Peer4
+Peer6 ~ 1*Peer5
+
+INTL2 ~ 1*INTL1     # This parameter regresses INTL2 perfectly on INTL1
+INTL3 ~ 1*INTL2
+INTL4 ~ 1*INTL3
+INTL5 ~ 1*INTL4
+INTL6 ~ 1*INTL5
+
+#Define the change score
+dPeer1 =~ 1*Peer2        # This defines the change score as measured perfectly by scores on Peer2
+dPeer2 =~ 1*Peer3
+dPeer3 =~ 1*Peer4
+dPeer4 =~ 1*Peer5
+dPeer5 =~ 1*Peer6
+         
+dINTL1 =~ 1*INTL2           # This defines the change score as measured perfectly by scores on INTL2
+dINTL2 =~ 1*INTL3           
+dINTL3 =~ 1*INTL4
+dINTL4 =~ 1*INTL5
+dINTL5 =~ 1*INTL6
+
+#Estimate residual variances
+PPeer_1~~PPeer_1          # This estimates the PPeerresidual variances
+PPeer_3~~PPeer_3
+PPeer_5~~PPeer_5
+PPeer_10~~PPeer_10
+PPeer_12~~PPeer_12
+PPeer_14~~PPeer_14
+
+TPeer_1~~TPeer_1          # This estimates the TPeerresidual variances
+TPeer_3~~TPeer_3
+TPeer_5~~TPeer_5
+TPeer_10~~TPeer_10
+TPeer_12~~TPeer_12
+TPeer_14~~TPeer_14
+
+INTL_1~~INTL_1          # This estimates the INTL residual variances
+INTL_3~~INTL_3
+INTL_5~~INTL_5
+INTL_10~~INTL_10
+INTL_12~~INTL_12
+INTL_14~~INTL_14
+
+
+#Covariates
+Peer1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+INTL1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+
+#Dynamics
+
+#Estimate the self-feedback parameters
+dPeer1~F1*Peer1       # This estimates the Peer self-feedback parameter
+dPeer2~F1*Peer2
+dPeer3~F1*Peer3
+dPeer4~F1*Peer4
+dPeer5~F1*Peer5
+
+dINTL1~F2*INTL1       # This estimates the INTL self-feedback parameter
+dINTL2~F2*INTL2
+dINTL3~F2*INTL3
+dINTL4~F2*INTL4
+dINTL5~F2*INTL5
+
+#Estimate coupling parameter
+dINTL1~C1*Peer1         # This estimates the Peer to INTL coupling parameter
+dINTL2~C1*Peer2
+dINTL3~C1*Peer3
+dINTL4~C1*Peer4
+dINTL5~C1*Peer5
+
+dPeer1~0*INTL1         # This estimates the INTL to Peer coupling parameter
+dPeer2~0*INTL2
+dPeer3~0*INTL3
+dPeer4~0*INTL4
+dPeer5~0*INTL5
+
+iPeer=~1*Peer1                   # This defines the Peer intercept measurement model
+sPeer=~1*dPeer1+ 1*dPeer2+ 1*dPeer3+ 1*dPeer4+ 1*dPeer5 # This defines the Peer slope measurement model
+iPeer~1                             # This estimates the Peer intercept intercept (mean)
+iPeer~~iPeer                         # This estimates the Peer intercept variance
+sPeer~1                             # This estimates the Peer slope intercept
+sPeer~~sPeer                         # This estimates the Peer slope variance
+
+iINTL=~1*INTL1                   # This defines the INTL intercept measurement model
+sINTL=~1*dINTL1+ 1*dINTL2+ 1*dINTL3+ 1*dINTL4+ 1*dINTL5 # This defines the INTL slope measurement model
+iINTL~1                             # This estimates the INTL intercept intercept (mean)
+iINTL~~iINTL                         # This estimates the INTL intercept variance
+sINTL~1                             # This estimates the INTL slope intercept
+sINTL~~sINTL                         # This estimates the INTL slope variance
+
+iINTL~~sINTL                      # This estimates the iINTL sINTL covariance
+iINTL~~sPeer                      # This estimates the iINTL sPeer covariance
+iINTL~~iPeer                      # This estimates the iINTL iPeer covariance
+iPeer~~sPeer                      # This estimates the iPeer sPeer covariance
+iPeer~~sINTL                      # This estimates the iPeer sINTL covariance
+sPeer~~sINTL                      # This estimates the sPeer sINTL covariance
+'
+
+fit_Peer_INTL_IR <- lavaan(Peer_INTL_IR, data=data_wide, missing="FIML", estimator="MLR")
+
+summary(fit_Peer_INTL_IR, fit.measures=T, standardized=T)
+
+fitmeasures(fit_Peer_INTL_IR, fit.measures=c("all"), baseline.model= fit_Peer_INTL_B)
+
+semPaths(fit_Peer_INTL_IR, 'std', 'est', curvePivot=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+```
+
+###Peer/INTL Interpersonal Scar model
+```{r Peer/INTL Interpersonal Risk model}
+Peer_INTL_IS <- '
+#Defining the latent variables
+Peer1=~1*PPeer_1+1*TPeer_1
+Peer2=~1*PPeer_3+1*TPeer_3
+Peer3=~1*PPeer_5+1*TPeer_5
+Peer4=~1*PPeer_10+1*TPeer_10
+Peer5=~1*PPeer_12+1*TPeer_12
+Peer6=~1*PPeer_14+1*TPeer_14
+
+INTL1=~1*INTL_1
+INTL2=~1*INTL_3
+INTL3=~1*INTL_5
+INTL4=~1*INTL_10
+INTL5=~1*INTL_12
+INTL6=~1*INTL_14
+
+#Define regressions
+Peer2 ~ 1*Peer1     # This parameter regresses PPeer_3 perfectly on PPeer_1
+Peer3 ~ 1*Peer2
+Peer4 ~ 1*Peer3
+Peer5 ~ 1*Peer4
+Peer6 ~ 1*Peer5
+
+INTL2 ~ 1*INTL1     # This parameter regresses INTL2 perfectly on INTL1
+INTL3 ~ 1*INTL2
+INTL4 ~ 1*INTL3
+INTL5 ~ 1*INTL4
+INTL6 ~ 1*INTL5
+
+#Define the change score
+dPeer1 =~ 1*Peer2        # This defines the change score as measured perfectly by scores on PPeer_3
+dPeer2 =~ 1*Peer3
+dPeer3 =~ 1*Peer4
+dPeer4 =~ 1*Peer5
+dPeer5 =~ 1*Peer6
+
+dINTL1 =~ 1*INTL2           # This defines the change score as measured perfectly by scores on INTL_3
+dINTL2 =~ 1*INTL3           
+dINTL3 =~ 1*INTL4
+dINTL4 =~ 1*INTL5
+dINTL5 =~ 1*INTL6
+
+#Estimate residual variances
+PPeer_1~~PPeer_1          # This estimates the PPeerresidual variances
+PPeer_3~~PPeer_3
+PPeer_5~~PPeer_5
+PPeer_10~~PPeer_10
+PPeer_12~~PPeer_12
+PPeer_14~~PPeer_14
+
+TPeer_1~~TPeer_1          # This estimates the TPeerresidual variances
+TPeer_3~~TPeer_3
+TPeer_5~~TPeer_5
+TPeer_10~~TPeer_10
+TPeer_12~~TPeer_12
+TPeer_14~~TPeer_14
+
+INTL_1~~INTL_1          # This estimates the INTL residual variances
+INTL_3~~INTL_3
+INTL_5~~INTL_5
+INTL_10~~INTL_10
+INTL_12~~INTL_12
+INTL_14~~INTL_14
+
+
+#Covariates
+Peer1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+INTL1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+
+#Dynamics
+
+#Estimate the self-feedback parameters
+dPeer1~F1*Peer1       # This estimates the Peer self-feedback parameter
+dPeer2~F1*Peer2
+dPeer3~F1*Peer3
+dPeer4~F1*Peer4
+dPeer5~F1*Peer5
+
+dINTL1~F2*INTL1       # This estimates the INTL self-feedback parameter
+dINTL2~F2*INTL2
+dINTL3~F2*INTL3
+dINTL4~F2*INTL4
+dINTL5~F2*INTL5
+
+#Estimate coupling parameter
+dINTL1~0*Peer1         # This estimates the Peer to INTL coupling parameter
+dINTL2~0*Peer2
+dINTL3~0*Peer3
+dINTL4~0*Peer4
+dINTL5~0*Peer5
+
+dPeer1~C2*INTL1         # This estimates the INTL to Peer coupling parameter
+dPeer2~C2*INTL2
+dPeer3~C2*INTL3
+dPeer4~C2*INTL4
+dPeer5~C2*INTL5
+
+iPeer=~1*Peer1                   # This defines the Peer intercept measurement model
+sPeer=~1*dPeer1+ 1*dPeer2+ 1*dPeer3+ 1*dPeer4+ 1*dPeer5 # This defines the Peer slope measurement model
+iPeer~1                             # This estimates the Peer intercept intercept (mean)
+iPeer~~iPeer                         # This estimates the Peer intercept variance
+sPeer~1                             # This estimates the Peer slope intercept
+sPeer~~sPeer                         # This estimates the Peer slope variance
+
+iINTL=~1*INTL1                   # This defines the INTL intercept measurement model
+sINTL=~1*dINTL1+ 1*dINTL2+ 1*dINTL3+ 1*dINTL4+ 1*dINTL5 # This defines the INTL slope measurement model
+iINTL~1                             # This estimates the INTL intercept intercept (mean)
+iINTL~~iINTL                         # This estimates the INTL intercept variance
+sINTL~1                             # This estimates the INTL slope intercept
+sINTL~~sINTL                         # This estimates the INTL slope variance
+
+iINTL~~sINTL                      # This estimates the iINTL sINTL covariance
+iINTL~~sPeer                      # This estimates the iINTL sPeer covariance
+iINTL~~iPeer                      # This estimates the iINTL iPeer covariance
+iPeer~~sPeer                      # This estimates the iPeer sPeer covariance
+iPeer~~sINTL                      # This estimates the iPeer sINTL covariance
+sPeer~~sINTL                      # This estimates the sPeer sINTL covariance
+'
+
+fit_Peer_INTL_IS <- lavaan(Peer_INTL_IS, data=data_wide, missing="FIML", estimator="MLR")
+
+summary(fit_Peer_INTL_IS, fit.measures=T, standardized=T)
+
+fitmeasures(fit_Peer_INTL_IS, fit.measures=c("all"), baseline.model= fit_Peer_INTL_B)
+
+semPaths(fit_Peer_INTL_IS, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+```
+
+###Peer/INTL Transactional model
+```{r Peer/INTL Transactional model}
+Peer_INTL_T <- '
+#Defining the latent variables
+Peer1=~1*PPeer_1+1*TPeer_1
+Peer2=~1*PPeer_3+1*TPeer_3
+Peer3=~1*PPeer_5+1*TPeer_5
+Peer4=~1*PPeer_10+1*TPeer_10
+Peer5=~1*PPeer_12+1*TPeer_12
+Peer6=~1*PPeer_14+1*TPeer_14
+
+INTL1=~1*INTL_1
+INTL2=~1*INTL_3
+INTL3=~1*INTL_5
+INTL4=~1*INTL_10
+INTL5=~1*INTL_12
+INTL6=~1*INTL_14
+
+#Define regressions
+Peer2 ~ 1*Peer1     # This parameter regresses PPeer_3 perfectly on PPeer_1
+Peer3 ~ 1*Peer2
+Peer4 ~ 1*Peer3
+Peer5 ~ 1*Peer4
+Peer6 ~ 1*Peer5
+
+INTL2 ~ 1*INTL1     # This parameter regresses INTL2 perfectly on INTL1
+INTL3 ~ 1*INTL2
+INTL4 ~ 1*INTL3
+INTL5 ~ 1*INTL4
+INTL6 ~ 1*INTL5
+
+#Define the change score
+dPeer1 =~ 1*Peer2        # This defines the change score as measured perfectly by scores on PPeer_3
+dPeer2 =~ 1*Peer3
+dPeer3 =~ 1*Peer4
+dPeer4 =~ 1*Peer5
+dPeer5 =~ 1*Peer6
+         
+dINTL1 =~ 1*INTL2           # This defines the change score as measured perfectly by scores on INTL_3
+dINTL2 =~ 1*INTL3           
+dINTL3 =~ 1*INTL4
+dINTL4 =~ 1*INTL5
+dINTL5 =~ 1*INTL6
+
+#Estimate residual variances
+PPeer_1~~PPeer_1          # This estimates the PPeerresidual variances
+PPeer_3~~PPeer_3
+PPeer_5~~PPeer_5
+PPeer_10~~PPeer_10
+PPeer_12~~PPeer_12
+PPeer_14~~PPeer_14
+
+TPeer_1~~TPeer_1          # This estimates the TPeerresidual variances
+TPeer_3~~TPeer_3
+TPeer_5~~TPeer_5
+TPeer_10~~TPeer_10
+TPeer_12~~TPeer_12
+TPeer_14~~TPeer_14
+
+INTL_1~~INTL_1          # This estimates the INTL residual variances
+INTL_3~~INTL_3
+INTL_5~~INTL_5
+INTL_10~~INTL_10
+INTL_12~~INTL_12
+INTL_14~~INTL_14
+
+
+#Covariates
+Peer1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+INTL1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+
+#Dynamics
+
+#Estimate the self-feedback parameters
+dPeer1~F1*Peer1       # This estimates the Peer self-feedback parameter
+dPeer2~F1*Peer2
+dPeer3~F1*Peer3
+dPeer4~F1*Peer4
+dPeer5~F1*Peer5
+
+dINTL1~F2*INTL1       # This estimates the INTL self-feedback parameter
+dINTL2~F2*INTL2
+dINTL3~F2*INTL3
+dINTL4~F2*INTL4
+dINTL5~F2*INTL5
+
+#Estimate coupling parameter
+dINTL1~C1*Peer1         # This estimates the Peer to INTL coupling parameter
+dINTL2~C1*Peer2
+dINTL3~C1*Peer3
+dINTL4~C1*Peer4
+dINTL5~C1*Peer5
+
+dPeer1~C2*INTL1         # This estimates the INTL to Peer coupling parameter
+dPeer2~C2*INTL2
+dPeer3~C2*INTL3
+dPeer4~C2*INTL4
+dPeer5~C2*INTL5
+
+iPeer=~1*Peer1                   # This defines the Peer intercept measurement model
+sPeer=~1*dPeer1+ 1*dPeer2+ 1*dPeer3+ 1*dPeer4+ 1*dPeer5 # This defines the Peer slope measurement model
+iPeer~1                             # This estimates the Peer intercept intercept (mean)
+iPeer~~iPeer                         # This estimates the Peer intercept variance
+sPeer~1                             # This estimates the Peer slope intercept
+sPeer~~sPeer                         # This estimates the Peer slope variance
+
+iINTL=~1*INTL1                   # This defines the INTL intercept measurement model
+sINTL=~1*dINTL1+ 1*dINTL2+ 1*dINTL3+ 1*dINTL4+ 1*dINTL5 # This defines the INTL slope measurement model
+iINTL~1                             # This estimates the INTL intercept intercept (mean)
+iINTL~~iINTL                         # This estimates the INTL intercept variance
+sINTL~1                             # This estimates the INTL slope intercept
+sINTL~~sINTL                         # This estimates the INTL slope variance
+
+iINTL~~sINTL                      # This estimates the iINTL sINTL covariance
+iINTL~~sPeer                      # This estimates the iINTL sPeer covariance
+iINTL~~iPeer                      # This estimates the iINTL iPeer covariance
+iPeer~~sPeer                      # This estimates the iPeer sPeer covariance
+iPeer~~sINTL                      # This estimates the iPeer sINTL covariance
+sPeer~~sINTL                      # This estimates the sPeer sINTL covariance
+'
+
+fit_Peer_INTL_T <- lavaan(Peer_INTL_T, data=data_wide, missing="FIML", estimator="MLR")
+
+summary(fit_Peer_INTL_T, fit.measures=T, standardized=T)
+
+fitmeasures(fit_Peer_INTL_T, fit.measures=c("all"), baseline.model= fit_Peer_INTL_B)
+
+semPaths(fit_Peer_INTL_T, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+```
+
+###Peer/INTL Developmental change model
+```{r Peer/INTL Developmental change model}
+Peer_INTL <- '
+#Defining the latent variables
+Peer1=~1*PPeer_1+1*TPeer_1
+Peer2=~1*PPeer_3+1*TPeer_3
+Peer3=~1*PPeer_5+1*TPeer_5
+Peer4=~1*PPeer_10+1*TPeer_10
+Peer5=~1*PPeer_12+1*TPeer_12
+Peer6=~1*PPeer_14+1*TPeer_14
+
+INTL1=~1*INTL_1
+INTL2=~1*INTL_3
+INTL3=~1*INTL_5
+INTL4=~1*INTL_10
+INTL5=~1*INTL_12
+INTL6=~1*INTL_14
+
+#Define regressions
+Peer2 ~ 1*Peer1
+Peer3 ~ 1*Peer2
+Peer4 ~ 1*Peer3
+Peer5 ~ 1*Peer4
+Peer6 ~ 1*Peer5
+
+INTL2 ~ 1*INTL1
+INTL3 ~ 1*INTL2
+INTL4 ~ 1*INTL3
+INTL5 ~ 1*INTL4
+INTL6 ~ 1*INTL5
+
+#Define the change score
+dPeer1 =~ 1*Peer2
+dPeer2 =~ 1*Peer3
+dPeer3 =~ 1*Peer4
+dPeer4 =~ 1*Peer5
+dPeer5 =~ 1*Peer6
+         
+dINTL1 =~ 1*INTL2
+dINTL2 =~ 1*INTL3           
+dINTL3 =~ 1*INTL4
+dINTL4 =~ 1*INTL5
+dINTL5 =~ 1*INTL6
+
+#Estimate residual variances
+PPeer_1~~PPeer_1          # This estimates the PPeerresidual variances
+PPeer_3~~PPeer_3
+PPeer_5~~PPeer_5
+PPeer_10~~PPeer_10
+PPeer_12~~PPeer_12
+PPeer_14~~PPeer_14
+
+TPeer_1~~TPeer_1          # This estimates the TPeerresidual variances
+TPeer_3~~TPeer_3
+TPeer_5~~TPeer_5
+TPeer_10~~TPeer_10
+TPeer_12~~TPeer_12
+TPeer_14~~TPeer_14
+
+INTL_1~~INTL_1          # This estimates the INTL residual variances
+INTL_3~~INTL_3
+INTL_5~~INTL_5
+INTL_10~~INTL_10
+INTL_12~~INTL_12
+INTL_14~~INTL_14
+
+
+#Covariates
+Peer1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+INTL1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+INTL6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+
+#Dynamics
+
+#Estimate the self-feedback parameters
+dPeer1~Peer1       # This estimates the Peer self-feedback parameter
+dPeer2~Peer2
+dPeer3~Peer3
+dPeer4~Peer4
+dPeer5~Peer5
+
+dINTL1~INTL1       # This estimates the INTL self-feedback parameter
+dINTL2~INTL2
+dINTL3~INTL3
+dINTL4~INTL4
+dINTL5~INTL5
+
+#Estimate coupling parameter
+dINTL1~Peer1         # This estimates the Peer to INTL coupling parameter
+dINTL2~Peer2
+dINTL3~Peer3
+dINTL4~Peer4
+dINTL5~Peer5
+
+dPeer1~INTL1         # This estimates the INTL to Peer coupling parameter
+dPeer2~INTL2
+dPeer3~INTL3
+dPeer4~INTL4
+dPeer5~INTL5
+
+iPeer=~1*Peer1                   # This defines the Peer intercept measurement model
+sPeer=~1*dPeer1+ 1*dPeer2+ 1*dPeer3+ 1*dPeer4+ 1*dPeer5 # This defines the Peer slope measurement model
+iPeer~1                             # This estimates the Peer intercept intercept (mean)
+iPeer~~iPeer                         # This estimates the Peer intercept variance
+sPeer~1                             # This estimates the Peer slope intercept
+sPeer~~sPeer                         # This estimates the Peer slope variance
+
+iINTL=~1*INTL1                   # This defines the INTL intercept measurement model
+sINTL=~1*dINTL1+ 1*dINTL2+ 1*dINTL3+ 1*dINTL4+ 1*dINTL5 # This defines the INTL slope measurement model
+iINTL~1                             # This estimates the INTL intercept intercept (mean)
+iINTL~~iINTL                         # This estimates the INTL intercept variance
+sINTL~1                             # This estimates the INTL slope intercept
+sINTL~~sINTL                         # This estimates the INTL slope variance
+
+iINTL~~sINTL                      # This estimates the iINTL sINTL covariance
+iINTL~~sPeer                      # This estimates the iINTL sPeer covariance
+iINTL~~iPeer                      # This estimates the iINTL iPeer covariance
+iPeer~~sPeer                      # This estimates the iPeer sPeer covariance
+iPeer~~sINTL                      # This estimates the iPeer sINTL covariance
+sPeer~~sINTL                      # This estimates the sPeer sINTL covariance
+'
+
+fit_Peer_INTL <- lavaan(Peer_INTL, data=data_wide, missing="FIML", estimator="MLR")
+
+summary(fit_Peer_INTL, fit.measures=T, standardized=T)
+
+fitmeasures(fit_Peer_INTL, fit.measures=c("all"), baseline.model= fit_Peer_INTL_B)
+
+semPaths(fit_Peer_INTL, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+```
+
+###Peer/INTL Model comparison
+```{r Model comparison}
+Peer_INTL_comparison <- matrix(ncol=6,nrow=6)
+Peer_INTL_comparison <- as.data.frame(Peer_INTL_comparison)
+Peer_INTL_comparison[,1] <- c("chisq","cfi.robust","rmsea.robust","logl","bic","aic")
+colnames(Peer_INTL_comparison) <- c("Fit_Statistics","Baseline","Interpersonal_Scar","Interpersonal_Risk","Transactional","Developmental")
+
+Peer_INTL_comparison[,2] <- fitmeasures(fit_Peer_INTL_B, fit.measures=c("chisq","cfi.robust","rmsea.robust","logl","bic","aic"))
+Peer_INTL_comparison[,3] <- fitmeasures(fit_Peer_INTL_IS, fit.measures=c("chisq","cfi.robust","rmsea.robust","logl","bic","aic"))
+Peer_INTL_comparison[,4] <- fitmeasures(fit_Peer_INTL_IR, fit.measures=c("chisq","cfi.robust","rmsea.robust","logl","bic","aic"))
+Peer_INTL_comparison[,5] <- fitmeasures(fit_Peer_INTL_T, fit.measures=c("chisq","cfi.robust","rmsea.robust","logl","bic","aic"))
+Peer_INTL_comparison[,6] <- fitmeasures(fit_Peer_INTL, fit.measures=c("chisq","cfi.robust","rmsea.robust","logl","bic","aic"))
+
+Peer_INTL_comparison[,2:6] <- round(Peer_INTL_comparison[,2:6], digits=3)
+```
+
+
+
+
+
+##Bivariate multiwave latent change model for Peer and EXTL
+###Peer/EXTL Baseline model
+```{r Peer/EXTL Baseline model}
+Peer_EXTL_B <- '
+#Defining the latent variables
+Peer1=~1*PPeer_1+1*TPeer_1
+Peer2=~1*PPeer_3+1*TPeer_3
+Peer3=~1*PPeer_5+1*TPeer_5
+Peer4=~1*PPeer_10+1*TPeer_10
+Peer5=~1*PPeer_12+1*TPeer_12
+Peer6=~1*PPeer_14+1*TPeer_14
+
+EXTL1=~1*EXTL_1
+EXTL2=~1*EXTL_3
+EXTL3=~1*EXTL_5
+EXTL4=~1*EXTL_10
+EXTL5=~1*EXTL_12
+EXTL6=~1*EXTL_14
+
+#Define regressions
+Peer2 ~ 1*Peer1     # This parameter regresses Peer2 perfectly on Peer1
+Peer3 ~ 1*Peer2
+Peer4 ~ 1*Peer3
+Peer5 ~ 1*Peer4
+Peer6 ~ 1*Peer5
+
+EXTL2 ~ 1*EXTL1     # This parameter regresses EXTL2 perfectly on EXTL1
+EXTL3 ~ 1*EXTL2
+EXTL4 ~ 1*EXTL3
+EXTL5 ~ 1*EXTL4
+EXTL6 ~ 1*EXTL5
+
+#Define the change score
+dPeer1 =~ 1*Peer2        # This defines the change score as measured perfectly by scores on Peer2
+dPeer2 =~ 1*Peer3
+dPeer3 =~ 1*Peer4
+dPeer4 =~ 1*Peer5
+dPeer5 =~ 1*Peer6
+         
+dEXTL1 =~ 1*EXTL2           # This defines the change score as measured perfectly by scores on EXTL2**
+dEXTL2 =~ 1*EXTL3           
+dEXTL3 =~ 1*EXTL4
+dEXTL4 =~ 1*EXTL5
+dEXTL5 =~ 1*EXTL6
+
+#Estimate residual variances
+PPeer_1~~PPeer_1          # This estimates the PPeerresidual variances
+PPeer_3~~PPeer_3
+PPeer_5~~PPeer_5
+PPeer_10~~PPeer_10
+PPeer_12~~PPeer_12
+PPeer_14~~PPeer_14
+
+TPeer_1~~TPeer_1          # This estimates the TPeerresidual variances
+TPeer_3~~TPeer_3
+TPeer_5~~TPeer_5
+TPeer_10~~TPeer_10
+TPeer_12~~TPeer_12
+TPeer_14~~TPeer_14
+
+EXTL_1~~EXTL_1          # This estimates the EXTL residual variances
+EXTL_3~~EXTL_3
+EXTL_5~~EXTL_5
+EXTL_10~~EXTL_10
+EXTL_12~~EXTL_12
+EXTL_14~~EXTL_14
+
+
+#Covariates
+Peer1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+EXTL1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+
+#Dynamics
+
+#Estimate the self-feedback parameters
+dPeer1~F1*Peer1       # This estimates the Peer self-feedback parameter
+dPeer2~F1*Peer2
+dPeer3~F1*Peer3
+dPeer4~F1*Peer4
+dPeer5~F1*Peer5
+
+dEXTL1~F2*EXTL1       # This estimates the EXTL self-feedback parameter
+dEXTL2~F2*EXTL2
+dEXTL3~F2*EXTL3
+dEXTL4~F2*EXTL4
+dEXTL5~F2*EXTL5
+
+#Estimate coupling parameter
+dEXTL1~0*Peer1         # This estimates the Peer to EXTL coupling parameter
+dEXTL2~0*Peer2
+dEXTL3~0*Peer3
+dEXTL4~0*Peer4
+dEXTL5~0*Peer5
+
+dPeer1~0*EXTL1         # This estimates the EXTL to Peer coupling parameter
+dPeer2~0*EXTL2
+dPeer3~0*EXTL3
+dPeer4~0*EXTL4
+dPeer5~0*EXTL5
+
+iPeer=~1*Peer1                   # This defines the Peer intercept measurement model
+sPeer=~1*dPeer1+ 1*dPeer2+ 1*dPeer3+ 1*dPeer4+ 1*dPeer5 # This defines the Peer slope measurement model
+iPeer~1                             # This estimates the Peer intercept intercept (mean)
+iPeer~~iPeer                         # This estimates the Peer intercept variance
+sPeer~1                             # This estimates the Peer slope intercept
+sPeer~~sPeer                         # This estimates the Peer slope variance
+
+iEXTL=~1*EXTL1                   # This defines the EXTL intercept measurement model
+sEXTL=~1*dEXTL1+ 1*dEXTL2+ 1*dEXTL3+ 1*dEXTL4+ 1*dEXTL5 # This defines the EXTL slope measurement model
+iEXTL~1                             # This estimates the EXTL intercept intercept (mean)
+iEXTL~~iEXTL                         # This estimates the EXTL intercept variance
+sEXTL~1                             # This estimates the EXTL slope intercept
+sEXTL~~sEXTL                         # This estimates the EXTL slope variance
+
+iEXTL~~sEXTL                      # This estimates the iEXTL sEXTL covariance
+iEXTL~~sPeer                      # This estimates the iEXTL sPeer covariance
+iEXTL~~iPeer                      # This estimates the iEXTL iPeer covariance
+iPeer~~sPeer                      # This estimates the iPeer sPeer covariance
+iPeer~~sEXTL                      # This estimates the iPeer sEXTL covariance
+sPeer~~sEXTL                      # This estimates the sPeer sEXTL covariance
+'
+
+fit_Peer_EXTL_B <- lavaan(Peer_EXTL_B, data=data_wide, missing="FIML", estimator="MLR")
+
+summary(fit_Peer_EXTL_B, fit.measures=T, standardized=T)
+
+semPaths(fit_Peer_EXTL_B, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+```
+
+###Peer/EXTL Interpersonal Risk model
+```{r Peer/EXTL Interpersonal Risk model}
+Peer_EXTL_IR <- '
+#Defining the latent variables
+Peer1=~1*PPeer_1+1*TPeer_1
+Peer2=~1*PPeer_3+1*TPeer_3
+Peer3=~1*PPeer_5+1*TPeer_5
+Peer4=~1*PPeer_10+1*TPeer_10
+Peer5=~1*PPeer_12+1*TPeer_12
+Peer6=~1*PPeer_14+1*TPeer_14
+
+EXTL1=~1*EXTL_1
+EXTL2=~1*EXTL_3
+EXTL3=~1*EXTL_5
+EXTL4=~1*EXTL_10
+EXTL5=~1*EXTL_12
+EXTL6=~1*EXTL_14
+
+#Define regressions
+Peer2 ~ 1*Peer1     # This parameter regresses Peer2 perfectly on Peer1
+Peer3 ~ 1*Peer2
+Peer4 ~ 1*Peer3
+Peer5 ~ 1*Peer4
+Peer6 ~ 1*Peer5
+
+EXTL2 ~ 1*EXTL1     # This parameter regresses EXTL2 perfectly on EXTL1
+EXTL3 ~ 1*EXTL2
+EXTL4 ~ 1*EXTL3
+EXTL5 ~ 1*EXTL4
+EXTL6 ~ 1*EXTL5
+
+#Define the change score
+dPeer1 =~ 1*Peer2        # This defines the change score as measured perfectly by scores on Peer2
+dPeer2 =~ 1*Peer3
+dPeer3 =~ 1*Peer4
+dPeer4 =~ 1*Peer5
+dPeer5 =~ 1*Peer6
+         
+dEXTL1 =~ 1*EXTL2           # This defines the change score as measured perfectly by scores on EXTL2
+dEXTL2 =~ 1*EXTL3           
+dEXTL3 =~ 1*EXTL4
+dEXTL4 =~ 1*EXTL5
+dEXTL5 =~ 1*EXTL6
+
+#Estimate residual variances
+PPeer_1~~PPeer_1          # This estimates the PPeer residual variances
+PPeer_3~~PPeer_3
+PPeer_5~~PPeer_5
+PPeer_10~~PPeer_10
+PPeer_12~~PPeer_12
+PPeer_14~~PPeer_14
+
+TPeer_1~~TPeer_1          # This estimates the TPeer residual variances
+TPeer_3~~TPeer_3
+TPeer_5~~TPeer_5
+TPeer_10~~TPeer_10
+TPeer_12~~TPeer_12
+TPeer_14~~TPeer_14
+
+EXTL_1~~EXTL_1          # This estimates the EXTL residual variances
+EXTL_3~~EXTL_3
+EXTL_5~~EXTL_5
+EXTL_10~~EXTL_10
+EXTL_12~~EXTL_12
+EXTL_14~~EXTL_14
+
+
+#Covariates
+Peer1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+EXTL1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+
+#Dynamics
+
+#Estimate the self-feedback parameters
+dPeer1~F1*Peer1       # This estimates the Peer self-feedback parameter
+dPeer2~F1*Peer2
+dPeer3~F1*Peer3
+dPeer4~F1*Peer4
+dPeer5~F1*Peer5
+
+dEXTL1~F2*EXTL1       # This estimates the EXTL self-feedback parameter
+dEXTL2~F2*EXTL2
+dEXTL3~F2*EXTL3
+dEXTL4~F2*EXTL4
+dEXTL5~F2*EXTL5
+
+#Estimate coupling parameter
+dEXTL1~C1*Peer1         # This estimates the Peer to EXTL coupling parameter
+dEXTL2~C1*Peer2
+dEXTL3~C1*Peer3
+dEXTL4~C1*Peer4
+dEXTL5~C1*Peer5
+
+dPeer1~0*EXTL1         # This estimates the EXTL to Peer coupling parameter
+dPeer2~0*EXTL2
+dPeer3~0*EXTL3
+dPeer4~0*EXTL4
+dPeer5~0*EXTL5
+
+iPeer=~1*Peer1                   # This defines the Peer intercept measurement model
+sPeer=~1*dPeer1+ 1*dPeer2+ 1*dPeer3+ 1*dPeer4+ 1*dPeer5 # This defines the Peer slope measurement model
+iPeer~1                             # This estimates the Peer intercept intercept (mean)
+iPeer~~iPeer                         # This estimates the Peer intercept variance
+sPeer~1                             # This estimates the Peer slope intercept
+sPeer~~sPeer                         # This estimates the Peer slope variance
+
+iEXTL=~1*EXTL1                   # This defines the EXTL intercept measurement model
+sEXTL=~1*dEXTL1+ 1*dEXTL2+ 1*dEXTL3+ 1*dEXTL4+ 1*dEXTL5 # This defines the EXTL slope measurement model
+iEXTL~1                             # This estimates the EXTL intercept intercept (mean)
+iEXTL~~iEXTL                         # This estimates the EXTL intercept variance
+sEXTL~1                             # This estimates the EXTL slope intercept
+sEXTL~~sEXTL                         # This estimates the EXTL slope variance
+
+iEXTL~~sEXTL                      # This estimates the iEXTL sEXTL covariance
+iEXTL~~sPeer                      # This estimates the iEXTL sPeer covariance
+iEXTL~~iPeer                      # This estimates the iEXTL iPeer covariance
+iPeer~~sPeer                      # This estimates the iPeer sPeer covariance
+iPeer~~sEXTL                      # This estimates the iPeer sEXTL covariance
+sPeer~~sEXTL                      # This estimates the sPeer sEXTL covariance
+'
+
+fit_Peer_EXTL_IR <- lavaan(Peer_EXTL_IR, data=data_wide, missing="FIML", estimator="MLR")
+
+summary(fit_Peer_EXTL_IR, fit.measures=T, standardized=T)
+
+fitmeasures(fit_Peer_EXTL_IR, fit.measures=c("all"), baseline.model= fit_Peer_EXTL_B)
+
+semPaths(fit_Peer_EXTL_IR, 'std', 'est', curvePivot=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+```
+
+###Peer/EXTL Interpersonal Scar model
+```{r Peer/EXTL Interpersonal Risk model}
+Peer_EXTL_IS <- '
+#Defining the latent variables
+Peer1=~1*PPeer_1+1*TPeer_1
+Peer2=~1*PPeer_3+1*TPeer_3
+Peer3=~1*PPeer_5+1*TPeer_5
+Peer4=~1*PPeer_10+1*TPeer_10
+Peer5=~1*PPeer_12+1*TPeer_12
+Peer6=~1*PPeer_14+1*TPeer_14
+
+EXTL1=~1*EXTL_1
+EXTL2=~1*EXTL_3
+EXTL3=~1*EXTL_5
+EXTL4=~1*EXTL_10
+EXTL5=~1*EXTL_12
+EXTL6=~1*EXTL_14
+
+#Define regressions
+Peer2 ~ 1*Peer1     # This parameter regresses PPeer_3 perfectly on PPeer_1
+Peer3 ~ 1*Peer2
+Peer4 ~ 1*Peer3
+Peer5 ~ 1*Peer4
+Peer6 ~ 1*Peer5
+
+EXTL2 ~ 1*EXTL1     # This parameter regresses EXTL2 perfectly on EXTL1
+EXTL3 ~ 1*EXTL2
+EXTL4 ~ 1*EXTL3
+EXTL5 ~ 1*EXTL4
+EXTL6 ~ 1*EXTL5
+
+#Define the change score
+dPeer1 =~ 1*Peer2        # This defines the change score as measured perfectly by scores on PPeer_3
+dPeer2 =~ 1*Peer3
+dPeer3 =~ 1*Peer4
+dPeer4 =~ 1*Peer5
+dPeer5 =~ 1*Peer6
+
+dEXTL1 =~ 1*EXTL2           # This defines the change score as measured perfectly by scores on EXTL_3
+dEXTL2 =~ 1*EXTL3           
+dEXTL3 =~ 1*EXTL4
+dEXTL4 =~ 1*EXTL5
+dEXTL5 =~ 1*EXTL6
+
+#Estimate residual variances
+PPeer_1~~PPeer_1          # This estimates the PPeerresidual variances
+PPeer_3~~PPeer_3
+PPeer_5~~PPeer_5
+PPeer_10~~PPeer_10
+PPeer_12~~PPeer_12
+PPeer_14~~PPeer_14
+
+TPeer_1~~TPeer_1          # This estimates the TPeerresidual variances
+TPeer_3~~TPeer_3
+TPeer_5~~TPeer_5
+TPeer_10~~TPeer_10
+TPeer_12~~TPeer_12
+TPeer_14~~TPeer_14
+
+EXTL_1~~EXTL_1          # This estimates the EXTL residual variances
+EXTL_3~~EXTL_3
+EXTL_5~~EXTL_5
+EXTL_10~~EXTL_10
+EXTL_12~~EXTL_12
+EXTL_14~~EXTL_14
+
+
+#Covariates
+Peer1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+EXTL1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+
+#Dynamics
+
+#Estimate the self-feedback parameters
+dPeer1~F1*Peer1       # This estimates the Peer self-feedback parameter
+dPeer2~F1*Peer2
+dPeer3~F1*Peer3
+dPeer4~F1*Peer4
+dPeer5~F1*Peer5
+
+dEXTL1~F2*EXTL1       # This estimates the EXTL self-feedback parameter
+dEXTL2~F2*EXTL2
+dEXTL3~F2*EXTL3
+dEXTL4~F2*EXTL4
+dEXTL5~F2*EXTL5
+
+#Estimate coupling parameter
+dEXTL1~0*Peer1         # This estimates the Peer to EXTL coupling parameter
+dEXTL2~0*Peer2
+dEXTL3~0*Peer3
+dEXTL4~0*Peer4
+dEXTL5~0*Peer5
+
+dPeer1~C2*EXTL1         # This estimates the EXTL to Peer coupling parameter
+dPeer2~C2*EXTL2
+dPeer3~C2*EXTL3
+dPeer4~C2*EXTL4
+dPeer5~C2*EXTL5
+
+iPeer=~1*Peer1                   # This defines the Peer intercept measurement model
+sPeer=~1*dPeer1+ 1*dPeer2+ 1*dPeer3+ 1*dPeer4+ 1*dPeer5 # This defines the Peer slope measurement model
+iPeer~1                             # This estimates the Peer intercept intercept (mean)
+iPeer~~iPeer                         # This estimates the Peer intercept variance
+sPeer~1                             # This estimates the Peer slope intercept
+sPeer~~sPeer                         # This estimates the Peer slope variance
+
+iEXTL=~1*EXTL1                   # This defines the EXTL intercept measurement model
+sEXTL=~1*dEXTL1+ 1*dEXTL2+ 1*dEXTL3+ 1*dEXTL4+ 1*dEXTL5 # This defines the EXTL slope measurement model
+iEXTL~1                             # This estimates the EXTL intercept intercept (mean)
+iEXTL~~iEXTL                         # This estimates the EXTL intercept variance
+sEXTL~1                             # This estimates the EXTL slope intercept
+sEXTL~~sEXTL                         # This estimates the EXTL slope variance
+
+iEXTL~~sEXTL                      # This estimates the iEXTL sEXTL covariance
+iEXTL~~sPeer                      # This estimates the iEXTL sPeer covariance
+iEXTL~~iPeer                      # This estimates the iEXTL iPeer covariance
+iPeer~~sPeer                      # This estimates the iPeer sPeer covariance
+iPeer~~sEXTL                      # This estimates the iPeer sEXTL covariance
+sPeer~~sEXTL                      # This estimates the sPeer sEXTL covariance
+'
+
+fit_Peer_EXTL_IS <- lavaan(Peer_EXTL_IS, data=data_wide, missing="FIML", estimator="MLR")
+
+summary(fit_Peer_EXTL_IS, fit.measures=T, standardized=T)
+
+fitmeasures(fit_Peer_EXTL_IS, fit.measures=c("all"), baseline.model= fit_Peer_EXTL_B)
+
+semPaths(fit_Peer_EXTL_IS, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+```
+
+###Peer/EXTL Transactional model
+```{r Peer/EXTL Transactional model}
+Peer_EXTL_T <- '
+#Defining the latent variables
+Peer1=~1*PPeer_1+1*TPeer_1
+Peer2=~1*PPeer_3+1*TPeer_3
+Peer3=~1*PPeer_5+1*TPeer_5
+Peer4=~1*PPeer_10+1*TPeer_10
+Peer5=~1*PPeer_12+1*TPeer_12
+Peer6=~1*PPeer_14+1*TPeer_14
+
+EXTL1=~1*EXTL_1
+EXTL2=~1*EXTL_3
+EXTL3=~1*EXTL_5
+EXTL4=~1*EXTL_10
+EXTL5=~1*EXTL_12
+EXTL6=~1*EXTL_14
+
+#Define regressions
+Peer2 ~ 1*Peer1     # This parameter regresses PPeer_3 perfectly on PPeer_1
+Peer3 ~ 1*Peer2
+Peer4 ~ 1*Peer3
+Peer5 ~ 1*Peer4
+Peer6 ~ 1*Peer5
+
+EXTL2 ~ 1*EXTL1     # This parameter regresses EXTL2 perfectly on EXTL1
+EXTL3 ~ 1*EXTL2
+EXTL4 ~ 1*EXTL3
+EXTL5 ~ 1*EXTL4
+EXTL6 ~ 1*EXTL5
+
+#Define the change score
+dPeer1 =~ 1*Peer2        # This defines the change score as measured perfectly by scores on PPeer_3
+dPeer2 =~ 1*Peer3
+dPeer3 =~ 1*Peer4
+dPeer4 =~ 1*Peer5
+dPeer5 =~ 1*Peer6
+         
+dEXTL1 =~ 1*EXTL2           # This defines the change score as measured perfectly by scores on EXTL_3
+dEXTL2 =~ 1*EXTL3           
+dEXTL3 =~ 1*EXTL4
+dEXTL4 =~ 1*EXTL5
+dEXTL5 =~ 1*EXTL6
+
+#Estimate residual variances
+PPeer_1~~PPeer_1          # This estimates the PPeerresidual variances
+PPeer_3~~PPeer_3
+PPeer_5~~PPeer_5
+PPeer_10~~PPeer_10
+PPeer_12~~PPeer_12
+PPeer_14~~PPeer_14
+
+TPeer_1~~TPeer_1          # This estimates the TPeerresidual variances
+TPeer_3~~TPeer_3
+TPeer_5~~TPeer_5
+TPeer_10~~TPeer_10
+TPeer_12~~TPeer_12
+TPeer_14~~TPeer_14
+
+EXTL_1~~EXTL_1          # This estimates the EXTL residual variances
+EXTL_3~~EXTL_3
+EXTL_5~~EXTL_5
+EXTL_10~~EXTL_10
+EXTL_12~~EXTL_12
+EXTL_14~~EXTL_14
+
+
+#Covariates
+Peer1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+EXTL1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+
+#Dynamics
+
+#Estimate the self-feedback parameters
+dPeer1~F1*Peer1       # This estimates the Peer self-feedback parameter
+dPeer2~F1*Peer2
+dPeer3~F1*Peer3
+dPeer4~F1*Peer4
+dPeer5~F1*Peer5
+
+dEXTL1~F2*EXTL1       # This estimates the EXTL self-feedback parameter
+dEXTL2~F2*EXTL2
+dEXTL3~F2*EXTL3
+dEXTL4~F2*EXTL4
+dEXTL5~F2*EXTL5
+
+#Estimate coupling parameter
+dEXTL1~C1*Peer1         # This estimates the Peer to EXTL coupling parameter
+dEXTL2~C1*Peer2
+dEXTL3~C1*Peer3
+dEXTL4~C1*Peer4
+dEXTL5~C1*Peer5
+
+dPeer1~C2*EXTL1         # This estimates the EXTL to Peer coupling parameter
+dPeer2~C2*EXTL2
+dPeer3~C2*EXTL3
+dPeer4~C2*EXTL4
+dPeer5~C2*EXTL5
+
+iPeer=~1*Peer1                   # This defines the Peer intercept measurement model
+sPeer=~1*dPeer1+ 1*dPeer2+ 1*dPeer3+ 1*dPeer4+ 1*dPeer5 # This defines the Peer slope measurement model
+iPeer~1                             # This estimates the Peer intercept intercept (mean)
+iPeer~~iPeer                         # This estimates the Peer intercept variance
+sPeer~1                             # This estimates the Peer slope intercept
+sPeer~~sPeer                         # This estimates the Peer slope variance
+
+iEXTL=~1*EXTL1                   # This defines the EXTL intercept measurement model
+sEXTL=~1*dEXTL1+ 1*dEXTL2+ 1*dEXTL3+ 1*dEXTL4+ 1*dEXTL5 # This defines the EXTL slope measurement model
+iEXTL~1                             # This estimates the EXTL intercept intercept (mean)
+iEXTL~~iEXTL                         # This estimates the EXTL intercept variance
+sEXTL~1                             # This estimates the EXTL slope intercept
+sEXTL~~sEXTL                         # This estimates the EXTL slope variance
+
+iEXTL~~sEXTL                      # This estimates the iEXTL sEXTL covariance
+iEXTL~~sPeer                      # This estimates the iEXTL sPeer covariance
+iEXTL~~iPeer                      # This estimates the iEXTL iPeer covariance
+iPeer~~sPeer                      # This estimates the iPeer sPeer covariance
+iPeer~~sEXTL                      # This estimates the iPeer sEXTL covariance
+sPeer~~sEXTL                      # This estimates the sPeer sEXTL covariance
+'
+
+fit_Peer_EXTL_T <- lavaan(Peer_EXTL_T, data=data_wide, missing="FIML", estimator="MLR")
+
+summary(fit_Peer_EXTL_T, fit.measures=T, standardized=T)
+
+fitmeasures(fit_Peer_EXTL_T, fit.measures=c("all"), baseline.model= fit_Peer_EXTL_B)
+
+semPaths(fit_Peer_EXTL_T, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+```
+
+###Peer/EXTL Developmental change model
+```{r Peer/EXTL Developmental change model}
+Peer_EXTL <- '
+#Defining the latent variables
+Peer1=~1*PPeer_1+1*TPeer_1
+Peer2=~1*PPeer_3+1*TPeer_3
+Peer3=~1*PPeer_5+1*TPeer_5
+Peer4=~1*PPeer_10+1*TPeer_10
+Peer5=~1*PPeer_12+1*TPeer_12
+Peer6=~1*PPeer_14+1*TPeer_14
+
+EXTL1=~1*EXTL_1
+EXTL2=~1*EXTL_3
+EXTL3=~1*EXTL_5
+EXTL4=~1*EXTL_10
+EXTL5=~1*EXTL_12
+EXTL6=~1*EXTL_14
+
+#Define regressions
+Peer2 ~ 1*Peer1
+Peer3 ~ 1*Peer2
+Peer4 ~ 1*Peer3
+Peer5 ~ 1*Peer4
+Peer6 ~ 1*Peer5
+
+EXTL2 ~ 1*EXTL1
+EXTL3 ~ 1*EXTL2
+EXTL4 ~ 1*EXTL3
+EXTL5 ~ 1*EXTL4
+EXTL6 ~ 1*EXTL5
+
+#Define the change score
+dPeer1 =~ 1*Peer2
+dPeer2 =~ 1*Peer3
+dPeer3 =~ 1*Peer4
+dPeer4 =~ 1*Peer5
+dPeer5 =~ 1*Peer6
+         
+dEXTL1 =~ 1*EXTL2
+dEXTL2 =~ 1*EXTL3           
+dEXTL3 =~ 1*EXTL4
+dEXTL4 =~ 1*EXTL5
+dEXTL5 =~ 1*EXTL6
+
+#Estimate residual variances
+PPeer_1~~PPeer_1          # This estimates the PPeerresidual variances
+PPeer_3~~PPeer_3
+PPeer_5~~PPeer_5
+PPeer_10~~PPeer_10
+PPeer_12~~PPeer_12
+PPeer_14~~PPeer_14
+
+TPeer_1~~TPeer_1          # This estimates the TPeerresidual variances
+TPeer_3~~TPeer_3
+TPeer_5~~TPeer_5
+TPeer_10~~TPeer_10
+TPeer_12~~TPeer_12
+TPeer_14~~TPeer_14
+
+EXTL_1~~EXTL_1          # This estimates the EXTL residual variances
+EXTL_3~~EXTL_3
+EXTL_5~~EXTL_5
+EXTL_10~~EXTL_10
+EXTL_12~~EXTL_12
+EXTL_14~~EXTL_14
+
+
+#Covariates
+Peer1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+Peer6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+EXTL1 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL2 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL3 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL4 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL5 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+EXTL6 ~ sex + T1Income_to_Need + IQ + T1_ACES_sum + rel_affective
+
+
+#Dynamics
+
+#Estimate the self-feedback parameters
+dPeer1~Peer1       # This estimates the Peer self-feedback parameter
+dPeer2~Peer2
+dPeer3~Peer3
+dPeer4~Peer4
+dPeer5~Peer5
+
+dEXTL1~EXTL1       # This estimates the EXTL self-feedback parameter
+dEXTL2~EXTL2
+dEXTL3~EXTL3
+dEXTL4~EXTL4
+dEXTL5~EXTL5
+
+#Estimate coupling parameter
+dEXTL1~Peer1         # This estimates the Peer to EXTL coupling parameter
+dEXTL2~Peer2
+dEXTL3~Peer3
+dEXTL4~Peer4
+dEXTL5~Peer5
+
+dPeer1~EXTL1         # This estimates the EXTL to Peer coupling parameter
+dPeer2~EXTL2
+dPeer3~EXTL3
+dPeer4~EXTL4
+dPeer5~EXTL5
+
+iPeer=~1*Peer1                   # This defines the Peer intercept measurement model
+sPeer=~1*dPeer1+ 1*dPeer2+ 1*dPeer3+ 1*dPeer4+ 1*dPeer5 # This defines the Peer slope measurement model
+iPeer~1                             # This estimates the Peer intercept intercept (mean)
+iPeer~~iPeer                         # This estimates the Peer intercept variance
+sPeer~1                             # This estimates the Peer slope intercept
+sPeer~~sPeer                         # This estimates the Peer slope variance
+
+iEXTL=~1*EXTL1                   # This defines the EXTL intercept measurement model
+sEXTL=~1*dEXTL1+ 1*dEXTL2+ 1*dEXTL3+ 1*dEXTL4+ 1*dEXTL5 # This defines the EXTL slope measurement model
+iEXTL~1                             # This estimates the EXTL intercept intercept (mean)
+iEXTL~~iEXTL                         # This estimates the EXTL intercept variance
+sEXTL~1                             # This estimates the EXTL slope intercept
+sEXTL~~sEXTL                         # This estimates the EXTL slope variance
+
+iEXTL~~sEXTL                      # This estimates the iEXTL sEXTL covariance
+iEXTL~~sPeer                      # This estimates the iEXTL sPeer covariance
+iEXTL~~iPeer                      # This estimates the iEXTL iPeer covariance
+iPeer~~sPeer                      # This estimates the iPeer sPeer covariance
+iPeer~~sEXTL                      # This estimates the iPeer sEXTL covariance
+sPeer~~sEXTL                      # This estimates the sPeer sEXTL covariance
+'
+
+fit_Peer_EXTL <- lavaan(Peer_EXTL, data=data_wide, missing="FIML", estimator="MLR")
+
+summary(fit_Peer_EXTL, fit.measures=T, standardized=T)
+
+fitmeasures(fit_Peer_EXTL, fit.measures=c("all"), baseline.model= fit_Peer_EXTL_B)
+
+semPaths(fit_Peer_EXTL, 'std', 'est', curveAdjacent=T, layout="tree", orthogonal=T, rescale=T,
+         label.cex=T, label.scale=T, normalize=F, sizeMan=3, sizeInt=1, sizeLat=3, intercepts=F)
+```
+
+###Peer/EXTL Model comparison
+```{r Model comparison}
+Peer_EXTL_comparison <- matrix(ncol=6,nrow=6)
+Peer_EXTL_comparison <- as.data.frame(Peer_EXTL_comparison)
+Peer_EXTL_comparison[,1] <- c("chisq","cfi.robust","rmsea.robust","logl","bic","aic")
+colnames(Peer_EXTL_comparison) <- c("Fit_Statistics","Baseline","Interpersonal_Scar","Interpersonal_Risk","Transactional","Developmental")
+
+Peer_EXTL_comparison[,2] <- fitmeasures(fit_Peer_EXTL_B, fit.measures=c("chisq","cfi.robust","rmsea.robust","logl","bic","aic"))
+Peer_EXTL_comparison[,3] <- fitmeasures(fit_Peer_EXTL_IS, fit.measures=c("chisq","cfi.robust","rmsea.robust","logl","bic","aic"))
+Peer_EXTL_comparison[,4] <- fitmeasures(fit_Peer_EXTL_IR, fit.measures=c("chisq","cfi.robust","rmsea.robust","logl","bic","aic"))
+Peer_EXTL_comparison[,5] <- fitmeasures(fit_Peer_EXTL_T, fit.measures=c("chisq","cfi.robust","rmsea.robust","logl","bic","aic"))
+Peer_EXTL_comparison[,6] <- fitmeasures(fit_Peer_EXTL, fit.measures=c("chisq","cfi.robust","rmsea.robust","logl","bic","aic"))
+
+Peer_EXTL_comparison[,2:6] <- round(Peer_EXTL_comparison[,2:6], digits=3)
+```
+
